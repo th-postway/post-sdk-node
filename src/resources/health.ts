@@ -7,6 +7,6 @@ export class HealthResource {
   /** Resolves to `"pong"` when the Merchant API is reachable. `GET health/ping`, no auth. */
   async ping(options?: RequestOptions): Promise<string> {
     const body = await this.http.request<unknown>({ ...options, method: 'GET', path: ['health', 'ping'], auth: false });
-    return String(body ?? '');
+    return typeof body === 'string' ? body : body == null ? '' : JSON.stringify(body);
   }
 }
