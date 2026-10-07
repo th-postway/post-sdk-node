@@ -1,6 +1,6 @@
-import type { HttpClient, RequestOptions } from '../http.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
 import type { FileHttpResponse } from '../types/common.js';
-import type { MerchantLabelOrderShipmentsRequest, MerchantLabelReceiptOptions } from '../types/label.js';
+import type { MerchantLabelOrderShipmentsRequest, MerchantLabelReceiptOptions } from '../types/labels.js';
 
 /** `api/label` — printable shipping labels and receipts, returned as base64 files. */
 export class LabelsResource {

@@ -1,5 +1,5 @@
-import type { HttpClient, RequestOptions } from '../http.js';
-import type { MerchantShipmentProviderData } from '../types/shipment-provider.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
+import type { MerchantShipmentProviderData } from '../types/shipment-providers.js';
 
 /** `api/shipment-provider` — couriers available to the store. */
 export class ShipmentProvidersResource {

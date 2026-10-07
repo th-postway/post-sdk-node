@@ -1,5 +1,5 @@
 import { PostwayApiError, PostwayBusinessError, PostwayConfigError, PostwayRequestError } from './errors.js';
-import type { HttpBaseResponse } from './types/common.js';
+import type { HttpBaseResponse } from '../types/common.js';
 import { SDK_VERSION } from './version.js';
 
 /** Per-call options accepted by every SDK method. */

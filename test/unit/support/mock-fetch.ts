@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { PostwayMerchantClient, type PostwayMerchantClientOptions } from '../src/index.js';
+import { PostwayMerchantClient, type PostwayMerchantClientOptions } from '../../../src/index.js';
 
 export const BASE_URL = 'https://merchant.test/merchant';
 export const TOKEN = 'tok_123';

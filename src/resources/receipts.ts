@@ -1,5 +1,5 @@
-import type { HttpClient, RequestOptions } from '../http.js';
-import type { PublicReceiptResponse } from '../types/receipt.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
+import type { PublicReceiptResponse } from '../types/receipts.js';
 
 /**
  * `api/receipt` — the public receipt behind the QR code printed on receipts.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MERCHANT_BASE_URLS, PostwayConfigError, PostwayMerchantClient } from '../src/index.js';
-import { json, only, setup } from './helpers.js';
+import { MERCHANT_BASE_URLS, PostwayConfigError, PostwayMerchantClient } from '../../../src/index.js';
+import { json, only, setup } from '../support/mock-fetch.js';
 
 describe('PostwayMerchantClient configuration', () => {
   const fetch = vi.fn();

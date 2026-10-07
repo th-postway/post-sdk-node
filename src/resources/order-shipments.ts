@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../http.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
 import type { FilterResponse } from '../types/common.js';
 import type {
   MerchantOrderShipmentCalculatePriceRequest,
@@ -6,7 +6,7 @@ import type {
   MerchantOrderShipmentCreateRequest,
   MerchantOrderShipmentData,
   MerchantOrderShipmentFilterRequest,
-} from '../types/order-shipment.js';
+} from '../types/order-shipments.js';
 
 /** `api/order-shipment` — the store's parcels. Every call is scoped to the token's store. */
 export class OrderShipmentsResource {

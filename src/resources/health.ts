@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../http.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
 
 /** `api/health` — liveness. */
 export class HealthResource {

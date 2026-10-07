@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../http.js';
+import type { HttpClient, RequestOptions } from '../core/http-client.js';
 import type { FilterResponse } from '../types/common.js';
 import type { MerchantThailand, MerchantThailandFilterRequest } from '../types/thailand.js';
 

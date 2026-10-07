@@ -5,8 +5,8 @@ import {
   PostwayConfigError,
   PostwayMerchantClient,
   PostwayRequestError,
-} from '../src/index.js';
-import { BASE_URL, apiError, json, only, setup, text } from './helpers.js';
+} from '../../../src/index.js';
+import { BASE_URL, apiError, json, only, setup, text } from '../support/mock-fetch.js';
 
 describe('HTTP layer', () => {
   it('encodes path parameters', async () => {

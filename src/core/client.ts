@@ -1,13 +1,13 @@
 import { MERCHANT_BASE_URLS, type MerchantEnvironment } from './environments.js';
 import { PostwayConfigError } from './errors.js';
-import { DEFAULT_TIMEOUT_MS, defaultUserAgent, HttpClient, type FetchLike } from './http.js';
-import { AuthResource } from './resources/auth.js';
-import { HealthResource } from './resources/health.js';
-import { LabelsResource } from './resources/labels.js';
-import { OrderShipmentsResource } from './resources/order-shipments.js';
-import { ReceiptsResource } from './resources/receipts.js';
-import { ShipmentProvidersResource } from './resources/shipment-providers.js';
-import { ThailandResource } from './resources/thailand.js';
+import { DEFAULT_TIMEOUT_MS, defaultUserAgent, HttpClient, type FetchLike } from './http-client.js';
+import { AuthResource } from '../resources/auth.js';
+import { HealthResource } from '../resources/health.js';
+import { LabelsResource } from '../resources/labels.js';
+import { OrderShipmentsResource } from '../resources/order-shipments.js';
+import { ReceiptsResource } from '../resources/receipts.js';
+import { ShipmentProvidersResource } from '../resources/shipment-providers.js';
+import { ThailandResource } from '../resources/thailand.js';
 
 export interface PostwayMerchantClientOptions {
   /**
