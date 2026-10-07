@@ -10,19 +10,20 @@ TypeScript SDK for the **Postway Merchant API**: create and track parcels, quote
 - [Method catalogue](#method-catalogue)
 - [Errors](#errors)
 - [Labels and receipt files](#labels-and-receipt-files)
+- [Security](#security)
 - [Units and conventions](#units-and-conventions)
 - [Development](#development)
 - [Mapping from the .NET SDK](#mapping-from-the-net-sdk)
 
 ## Requirements
 
-**Node.js ≥ 22.**
+**Node.js ≥ 22.12.**
 
-The package is ESM-only (`"type": "module"`), and `import` works on every Node 22.x. Node 22.12 is the first LTS release where `require()` of an ES module works without a flag, so CommonJS callers need Node ≥ 22.12. One build serves both module systems:
+The package is ESM-only (`"type": "module"`). Node 22.12 is the first LTS release where `require()` of an ES module works without a flag, so one build serves both module systems:
 
 ```js
 import { PostwayMerchantClient } from '@th-postway/post-sdk'; // ESM
-const { PostwayMerchantClient } = require('@th-postway/post-sdk'); // CommonJS, Node >= 22.12
+const { PostwayMerchantClient } = require('@th-postway/post-sdk'); // CommonJS
 ```
 
 Types resolve through the `exports` map under both `moduleResolution: "nodenext"` and `"bundler"`.
@@ -38,6 +39,7 @@ npm install @th-postway/post-sdk
 ```ts
 import { PostwayMerchantClient, LabelSize, LabelOrientation, decodeFile } from '@th-postway/post-sdk';
 import { writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 const postway = new PostwayMerchantClient({
   accessToken: process.env.POSTWAY_ACCESS_TOKEN, // never hardcode it
@@ -76,7 +78,8 @@ const label = await postway.labels.orderShipments({
   label_size: LabelSize.Size4x6,
   label_orientation: LabelOrientation.Portrait,
 });
-await writeFile(label.file_name, decodeFile(label));
+// basename() keeps a server-supplied name from escaping the current directory.
+await writeFile(basename(label.file_name), decodeFile(label));
 ```
 
 ## Authentication
@@ -107,17 +110,19 @@ new PostwayMerchantClient({ baseUrl: 'https://sandbox-post.postway.co.th/merchan
 
 ### Client options
 
-| Option        | Default                             | Notes                                               |
-| ------------- | ----------------------------------- | --------------------------------------------------- |
-| `accessToken` | —                                   | Merchant session token                              |
-| `tokenType`   | `"Bearer"`                          | First word of `Authorization`                       |
-| `environment` | `"production"`                      | See table above                                     |
-| `baseUrl`     | from `environment`                  | Absolute URL; trailing `/` ignored                  |
-| `timeoutMs`   | `60000`                             | Per request; override per call with `{ timeoutMs }` |
-| `fetch`       | `globalThis.fetch`                  | Inject for proxies, tracing or tests                |
-| `userAgent`   | `postway-sdk-node/<ver> node/<ver>` |                                                     |
+| Option        | Default                             | Notes                                                                        |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `accessToken` | —                                   | Merchant session token                                                       |
+| `tokenType`   | `"Bearer"`                          | Auth scheme word of `Authorization`                                          |
+| `environment` | `"production"`                      | See table above                                                              |
+| `baseUrl`     | from `environment`                  | `https://` only (`http://` for localhost); no credentials, query or fragment |
+| `timeoutMs`   | `60000`                             | Per request; override per call with `{ timeoutMs }`                          |
+| `fetch`       | `globalThis.fetch`                  | Inject for proxies, tracing or tests                                         |
+| `userAgent`   | `postway-sdk-node/<ver> node/<ver>` |                                                                              |
 
 Every method takes a final `options` argument: `{ signal?: AbortSignal, timeoutMs?: number }`.
+
+The constructor validates every option and throws `PostwayConfigError` for unsafe values. Its messages never repeat the value, so they are safe to log.
 
 ## Method catalogue
 
@@ -163,12 +168,12 @@ if (parcel.order_shipment_status === OrderShipmentStatus.InTransit) {
 
 All errors extend `PostwayError`.
 
-| Class                                                | When                                                      | Useful fields                                           |
-| ---------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
-| `PostwayApiError`                                    | Non-2xx response                                          | `status`, `code`, `messages[]`, `body`, `method`, `url` |
-| `PostwayBusinessError` _(extends `PostwayApiError`)_ | 2xx response whose envelope says `isSuccess: false`       | same                                                    |
-| `PostwayRequestError`                                | Network failure, abort or timeout; nothing came back      | `cause`, `method`, `url`                                |
-| `PostwayConfigError`                                 | Invalid client options, or a guarded call without a token | —                                                       |
+| Class                                                | When                                                                        | Useful fields                                           |
+| ---------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `PostwayApiError`                                    | Non-2xx response                                                            | `status`, `code`, `messages[]`, `body`, `method`, `url` |
+| `PostwayBusinessError` _(extends `PostwayApiError`)_ | 2xx response whose envelope says `isSuccess: false`                         | same                                                    |
+| `PostwayRequestError`                                | Network failure, abort or timeout; nothing came back                        | `cause`, `method`, `url`                                |
+| `PostwayConfigError`                                 | Invalid client options or call arguments, or a guarded call without a token | —                                                       |
 
 The server reports errors as `{ code, isSuccess: false, message, data: null }` with the real HTTP status:
 
@@ -180,6 +185,11 @@ The server reports errors as `{ code, isSuccess: false, message, data: null }` w
 | 500  | Server error; `messages` is a generic text                                                      |
 
 `code` in the body is **400 or 500**, not the HTTP status. Use `status` to branch.
+
+Two details keep error logs safe to keep:
+
+- `url` is the **route template** (`…/receipt/public/:token`), not the URL that was sent. Receipt tokens, tracking numbers and refs never appear in `url` or `message`.
+- `body` is **non-enumerable**: `console.error(error)` and `JSON.stringify(error)` leave it out. Read `error.body` explicitly when you need the raw response.
 
 `orderShipments.create` and `cancel` can fail **with HTTP 201** and `isSuccess: false`, for example when verification or the courier rejects the parcel. The SDK turns that into `PostwayBusinessError`, so a resolved promise always means success.
 
@@ -210,6 +220,18 @@ interface FileHttpResponse {
 
 `decodeFile(file)` returns a `Buffer`.
 
+## Security
+
+- **Transport**: `baseUrl` must be `https://`; plain `http://` is accepted only for `localhost`, `127.0.0.1` and `[::1]`. URLs with credentials, a query string or a fragment are rejected.
+- **Headers**: `accessToken`, `tokenType` and `userAgent` are checked at construction so a pasted token with a stray line break cannot inject headers or leak into an error message.
+- **Paths**: caller-supplied path parameters are URL-encoded and may not be empty, `.` or `..`, so a bad input cannot reach a different endpoint.
+- **Redirects** are refused (`redirect: 'error'`); the API never redirects, and following one could re-send `Authorization` elsewhere.
+- **Errors** report route templates instead of parameter values, and response bodies are non-enumerable (see [Errors](#errors)).
+- The SDK has **no runtime dependencies**, never logs, and never reads environment variables.
+- The access token is held in a private field and is only sent on authenticated routes. Store it in a secret manager or environment variable, never in source control.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## Units and conventions
 
 - Weight is in **grams**. Width, length and height are in **cm**. Money is in **THB**.
@@ -220,13 +242,23 @@ interface FileHttpResponse {
 ## Development
 
 ```bash
-npm install
-npm run typecheck   # tsc --noEmit over src + test
-npm test            # unit tests (vitest, mocked fetch, no network)
-npm run build       # emits dist/ (ESM + .d.ts + source maps)
+nvm use             # Node 22 (.nvmrc); the dev toolchain needs >= 22.13
+npm ci
+npm run check       # typecheck + lint + format:check + unit tests
+npm test            # unit tests only (vitest, mocked fetch, no network)
+npm run build       # emits dist/ (ESM + .d.ts)
 ```
 
-The dev toolchain (Vitest) needs Node ≥ 22.12, even though the published package runs on any Node 22.x.
+```
+src/core/        client, http-client, errors, environments, validation, version
+src/resources/   one class per API area (auth, order-shipments, labels, ...)
+src/types/       request/response types, one file per resource, plus enums
+src/utils/       decodeFile
+test/unit/       mirrors src/; test/unit/support holds the mocked fetch
+test/integration read-only live checks, skipped without credentials
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the release procedure.
 
 Unit tests assert the exact method, URL, headers and body for every endpoint, plus error mapping, the 201 + `isSuccess:false` case, empty-body → `null`, timeouts and aborts.
 

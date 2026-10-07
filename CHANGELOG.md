@@ -1,0 +1,32 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [22.0.0] - 2026-10-07
+
+Initial public release.
+
+### Added
+
+- `PostwayMerchantClient` with resources for auth, order shipments, shipment providers, Thailand postal areas, labels, public receipts and health.
+- Runtime enums (`LabelSize`, `OrderShipmentStatus`, ...) exported as `as const` objects plus union types.
+- `decodeFile()` for base64 label and receipt files.
+- Typed errors: `PostwayApiError`, `PostwayBusinessError`, `PostwayRequestError`, `PostwayConfigError`.
+
+### Security
+
+- `baseUrl` must be `https://` (plain `http://` only for loopback hosts) with no credentials, query or fragment.
+- `accessToken`, `tokenType` and `userAgent` are validated as safe header values at construction.
+- Caller-supplied path parameters may not be empty, `.` or `..`.
+- Redirects are refused.
+- Error `url` and `message` report route templates (`receipt/public/:token`) instead of parameter values; `PostwayApiError.body` is non-enumerable.
+- `PostwayConfigError` messages never echo the offending input.
+
+### Changed
+
+- Only the `production` and `sandbox` environments are built in. Pass `baseUrl` for any other host.
+
+[Unreleased]: https://github.com/th-postway/post-sdk-node/compare/v22.0.0...HEAD
+[22.0.0]: https://github.com/th-postway/post-sdk-node/releases/tag/v22.0.0
