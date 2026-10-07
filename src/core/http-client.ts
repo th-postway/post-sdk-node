@@ -28,7 +28,7 @@ export interface HttpCall extends RequestOptions {
   path: readonly string[];
   query?: Record<string, string | undefined>;
   body?: unknown;
-  /** Send `Authorization` (MerchantGuard routes). */
+  /** Send `Authorization` (authenticated routes). */
   auth: boolean;
 }
 

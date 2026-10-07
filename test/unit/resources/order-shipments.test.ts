@@ -79,7 +79,7 @@ describe('orderShipments', () => {
   });
 
   it.each([
-    ['empty body (what Nest sends for null)', () => empty()],
+    ['empty body (what the API sends for null)', () => empty()],
     ['JSON null', () => json(null)],
   ])('getByTrackingNo resolves null on %s', async (_label, response) => {
     const { client } = setup([response()]);

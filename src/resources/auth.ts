@@ -1,7 +1,7 @@
 import type { HttpClient, RequestOptions } from '../core/http-client.js';
 import type { MerchantAuthAccountInfoResponse } from '../types/auth.js';
 
-/** `api/auth` — session introspection. */
+/** `auth/*` — session introspection. */
 export class AuthResource {
   constructor(private readonly http: HttpClient) {}
 

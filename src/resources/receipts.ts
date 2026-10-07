@@ -2,7 +2,7 @@ import type { HttpClient, RequestOptions } from '../core/http-client.js';
 import type { PublicReceiptResponse } from '../types/receipts.js';
 
 /**
- * `api/receipt` — the public receipt behind the QR code printed on receipts.
+ * `receipt/*` — the public receipt behind the QR code printed on receipts.
  * No access token is sent; the receipt token in the URL is the credential.
  */
 export class ReceiptsResource {

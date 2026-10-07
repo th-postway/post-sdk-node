@@ -1,7 +1,7 @@
 /**
  * Live, read-only checks against a real Merchant API.
  *
- *   POSTWAY_MERCHANT_BASE_URL=https://post.postway.co.th/merchant/dev \
+ *   POSTWAY_MERCHANT_BASE_URL=https://sandbox-post.postway.co.th/merchant \
  *   POSTWAY_MERCHANT_ACCESS_TOKEN=... npm run test:integration
  *
  * Skipped unless both variables are set. Never creates or cancels anything.

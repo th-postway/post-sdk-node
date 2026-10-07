@@ -53,7 +53,7 @@ export class PostwayMerchantClient {
     const baseUrl = options.baseUrl ?? MERCHANT_BASE_URLS[environment];
     if (!baseUrl) {
       throw new PostwayConfigError(
-        `Unknown environment "${environment}"; use one of ${Object.keys(MERCHANT_BASE_URLS).join(', ')} or pass baseUrl`,
+        `environment must be one of: ${Object.keys(MERCHANT_BASE_URLS).join(', ')} (or pass baseUrl)`,
       );
     }
     try {

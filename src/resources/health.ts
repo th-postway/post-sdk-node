@@ -1,6 +1,6 @@
 import type { HttpClient, RequestOptions } from '../core/http-client.js';
 
-/** `api/health` — liveness. */
+/** `health/*` — liveness. */
 export class HealthResource {
   constructor(private readonly http: HttpClient) {}
 

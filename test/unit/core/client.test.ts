@@ -15,7 +15,7 @@ describe('PostwayMerchantClient configuration', () => {
   });
 
   it('lets an explicit baseUrl win over environment and strips trailing slashes', () => {
-    const client = new PostwayMerchantClient({ baseUrl: 'http://localhost:3000/api//', environment: 'staging', fetch });
+    const client = new PostwayMerchantClient({ baseUrl: 'http://localhost:3000/api//', environment: 'sandbox', fetch });
     expect(client.baseUrl).toBe('http://localhost:3000/api');
   });
 

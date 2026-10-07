@@ -11,7 +11,7 @@ export interface RecordedCall {
   body: unknown;
 }
 
-/** JSON response the way Nest/Express sends it. */
+/** JSON response as the API sends it. */
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -19,7 +19,7 @@ export function json(body: unknown, status = 200): Response {
   });
 }
 
-/** Empty body — what Nest sends when a handler returns `null`. */
+/** Empty body, which the API sends when a route returns `null`. */
 export function empty(status = 200): Response {
   return new Response(null, { status });
 }
@@ -28,7 +28,7 @@ export function text(body: string, status = 200, contentType = 'text/html; chars
   return new Response(body, { status, headers: { 'content-type': contentType } });
 }
 
-/** The error body produced by post-api's AllExceptionsFilter. */
+/** The API's error envelope. */
 export function apiError(status: number, message: string | string[], code = status === 500 ? 500 : 400): Response {
   return json({ code, isSuccess: false, message, data: null }, status);
 }

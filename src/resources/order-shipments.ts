@@ -8,7 +8,7 @@ import type {
   MerchantOrderShipmentFilterRequest,
 } from '../types/order-shipments.js';
 
-/** `api/order-shipment` — the store's parcels. Every call is scoped to the token's store. */
+/** `order-shipment/*` — the store's parcels. Every call is scoped to the token's store. */
 export class OrderShipmentsResource {
   constructor(private readonly http: HttpClient) {}
 

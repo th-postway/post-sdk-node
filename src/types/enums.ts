@@ -1,9 +1,8 @@
 /**
  * Enum values used on the Merchant API wire.
  *
- * Copied from `@postway/data` 22.0.2 (the server's source of truth). That package lives on
- * Postway's private registry, so the values are mirrored here instead of depended on. Each enum
- * is a frozen `as const` object (usable at runtime) plus a union type of its values.
+ * Mirrored from the Merchant API's published schema. Each enum is a frozen `as const` object
+ * (usable at runtime) plus a union type of its values.
  */
 
 type ValueOf<T> = T[keyof T];

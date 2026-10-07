@@ -94,20 +94,15 @@ Authorization: Bearer <accessToken>
 
 ## Environments
 
-| `environment`            | Base URL                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------ |
-| `production` _(default)_ | `https://post.postway.co.th/merchant`                                                |
-| `staging`                | `https://post.postway.co.th/merchant/stg`                                            |
-| `development`            | `https://post.postway.co.th/merchant/dev`                                            |
-| `sandbox`                | `https://sandbox-post.postway.co.th/merchant` (backed by the development deployment) |
-| `local`                  | `http://localhost:3000/api`                                                          |
-
-The cluster ingress rewrites `/merchant/<path>` to the service's `/api/<path>`, which is why public URLs have no `/api` segment. When you run the Nest `merchant` app yourself (`MERCHANT_PORT`, default 3000) the routes live under `/api`. Its Swagger UI is at `/docs`.
+| `environment`            | Base URL                                      |
+| ------------------------ | --------------------------------------------- |
+| `production` _(default)_ | `https://post.postway.co.th/merchant`         |
+| `sandbox`                | `https://sandbox-post.postway.co.th/merchant` |
 
 `baseUrl` overrides `environment`:
 
 ```ts
-new PostwayMerchantClient({ baseUrl: 'http://localhost:3006/api', accessToken });
+new PostwayMerchantClient({ baseUrl: 'https://sandbox-post.postway.co.th/merchant', accessToken });
 ```
 
 ### Client options
@@ -238,14 +233,14 @@ Unit tests assert the exact method, URL, headers and body for every endpoint, pl
 Integration tests are **read-only** (ping, account info, couriers, Thailand and parcel filters, unknown tracking number → `null`, invalid token → 403). They are skipped unless both variables are set:
 
 ```bash
-POSTWAY_MERCHANT_BASE_URL=https://post.postway.co.th/merchant/dev \
+POSTWAY_MERCHANT_BASE_URL=https://sandbox-post.postway.co.th/merchant \
 POSTWAY_MERCHANT_ACCESS_TOKEN=... \
 npm run test:integration
 ```
 
 They never create or cancel parcels.
 
-The request and response types mirror `post-api` `libs/data/src/models/view-models/merchants/**`. Enum values are copied from `@postway/data` 22.0.2. When the Merchant API changes, update `src/types/*` and the matching test in `test/resources.test.ts`. `SDK_VERSION` in `src/version.ts` must equal `package.json` `version`, and a test enforces this.
+The request and response types mirror the Merchant API's published schema (the original model names appear in backticks in the JSDoc). When the Merchant API changes, update `src/types/*`, the resource, and the matching test in `test/unit/resources/<resource>.test.ts`. `SDK_VERSION` in `src/core/version.ts` must equal `package.json` `version`; `test/unit/package-surface.test.ts` enforces this and snapshots the public export list, so update both deliberately.
 
 ## Mapping from the .NET SDK
 
