@@ -1,3 +1,4 @@
+export type { AccessToken, AccessTokenProvider, AccessTokenRefreshReason } from './access-token.js';
 export { PostwayMerchantClient, type PostwayMerchantClientOptions } from './client.js';
 export { MERCHANT_BASE_URLS, type MerchantEnvironment } from './environments.js';
 export {

@@ -5,6 +5,7 @@ TypeScript SDK for the **Postway Merchant API**: create and track parcels, quote
 - [Requirements](#requirements)
 - [Install](#install)
 - [Quick start](#quick-start)
+- [Demo](#demo)
 - [Authentication](#authentication)
 - [Environments](#environments)
 - [Method catalogue](#method-catalogue)
@@ -82,6 +83,17 @@ const label = await postway.labels.orderShipments({
 await writeFile(basename(label.file_name), decodeFile(label));
 ```
 
+## Demo
+
+[`demo/quick-start.ts`](demo/README.md) is the Quick start as a script you can run from a clone of this repository. It pings, reads account info, couriers, Thai postal areas and the store's parcels. It targets **sandbox** and is **read-only** unless you set `POSTWAY_DEMO_CREATE=1`, which also creates a sandbox parcel and saves its label. The token comes from the environment only.
+
+```bash
+npm ci
+POSTWAY_ACCESS_TOKEN=... npm run demo   # builds dist/, then runs the demo
+```
+
+See [demo/README.md](demo/README.md) for every variable and for using the local SDK in another project. The Python and .NET SDKs ship the same demo. The demo is not part of the published package.
+
 ## Authentication
 
 The Merchant API uses a **merchant session access token**. Postway issues it to your store out of band; there is no token endpoint in the API. The SDK sends it as:
@@ -92,8 +104,28 @@ Authorization: Bearer <accessToken>
 
 - The server looks up the session by token type plus token, so pass `tokenType` only if Postway gave you a different type. The default is `"Bearer"`.
 - Every call acts as the **owner of the store** the token belongs to, and every query is scoped to that store.
-- A missing, unknown or **expired** token gets HTTP **403**. `auth.accountInfo()` returns `session.expired`, so you can rotate the token before it expires.
-- `receipts.*` and `health.ping()` are public and never send the token. Every other method throws `PostwayConfigError` before any network call if the client has no `accessToken`.
+- A missing, unknown or **expired** token gets HTTP **403**. `auth.accountInfo()` returns `session.expired`; pass `getAccessToken` (below) and the SDK rotates the token for you.
+- `receipts.*` and `health.ping()` are public and never send the token. Every other method throws `PostwayConfigError` before any network call if the client has neither `accessToken` nor `getAccessToken`.
+
+### Refreshing tokens automatically
+
+The API cannot issue tokens, so you supply them: `getAccessToken(reason)` returns a token string or `{ accessToken, expiresAt? }`, and the SDK decides when to call it.
+
+```ts
+const postway = new PostwayMerchantClient({
+  getAccessToken: async reason => {
+    // reason: 'initial' | 'expiring' | 'forbidden'
+    const { token, expiresAt } = await mySecretStore.fetchPostwayToken();
+    return { accessToken: token, expiresAt }; // or just the token string
+  },
+});
+```
+
+- **When it is called**: once for the first token (`'initial'`), when **75% of the token's lifetime has elapsed** (less than 25% left, `'expiring'`), and after a **403** (`'forbidden'`). If both `accessToken` and `getAccessToken` are set, the static token is used first.
+- **Lifetime** comes from the first source available: the `expiresAt` you return, else the JWT `exp` / `iat` claims (decoded locally; the signature is not checked), else one `POST auth/account/info` probe per token that reads `session.expired`. Your own `auth.accountInfo()` calls update it as well. A probe answered with 403 refreshes straight away; any other probe failure is ignored and the call goes ahead.
+- **403 replay**: when an authenticated call gets a 403, the SDK refreshes once and sends the same request once more. A second 403 throws `PostwayApiError` as usual, so it never loops. The API rejects the token before the request runs, so the replay is safe for `create` and `cancel` too.
+- Concurrent calls share one `getAccessToken` call and one probe. Errors thrown by `getAccessToken` propagate unchanged, and nothing is sent. A returned token that is not a safe header value throws `PostwayConfigError` without echoing it.
+- Without `getAccessToken` nothing changes: no probe, no refresh, no replay.
 
 ## Environments
 
@@ -110,15 +142,16 @@ new PostwayMerchantClient({ baseUrl: 'https://sandbox-post.postway.co.th/merchan
 
 ### Client options
 
-| Option        | Default                             | Notes                                                                        |
-| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
-| `accessToken` | —                                   | Merchant session token                                                       |
-| `tokenType`   | `"Bearer"`                          | Auth scheme word of `Authorization`                                          |
-| `environment` | `"production"`                      | See table above                                                              |
-| `baseUrl`     | from `environment`                  | `https://` only (`http://` for localhost); no credentials, query or fragment |
-| `timeoutMs`   | `60000`                             | Per request; override per call with `{ timeoutMs }`                          |
-| `fetch`       | `globalThis.fetch`                  | Inject for proxies, tracing or tests                                         |
-| `userAgent`   | `postway-sdk-node/<ver> node/<ver>` |                                                                              |
+| Option           | Default                             | Notes                                                                        |
+| ---------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `accessToken`    | —                                   | Merchant session token                                                       |
+| `getAccessToken` | —                                   | Token provider; turns on automatic refresh (see above)                       |
+| `tokenType`      | `"Bearer"`                          | Auth scheme word of `Authorization`                                          |
+| `environment`    | `"production"`                      | See table above                                                              |
+| `baseUrl`        | from `environment`                  | `https://` only (`http://` for localhost); no credentials, query or fragment |
+| `timeoutMs`      | `60000`                             | Per request; override per call with `{ timeoutMs }`                          |
+| `fetch`          | `globalThis.fetch`                  | Inject for proxies, tracing or tests                                         |
+| `userAgent`      | `postway-sdk-node/<ver> node/<ver>` |                                                                              |
 
 Every method takes a final `options` argument: `{ signal?: AbortSignal, timeoutMs?: number }`.
 
@@ -148,7 +181,7 @@ Paths are relative to the base URL.
 
 Behaviour worth knowing:
 
-- **`orderShipments.create`** accepts one request or an array; the server always receives an array. Each parcel is priced, verified, created, booked with the courier, and covered by one receipt. It is **not idempotent** and the SDK never retries it. A batch stops at the first failing parcel, and parcels created before that failure remain. On `PostwayBusinessError`, look them up by `my_tracking_no` (`orderShipments.filter`) before you resubmit.
+- **`orderShipments.create`** accepts one request or an array; the server always receives an array. Each parcel is priced, verified, created, booked with the courier, and covered by one receipt. It is **not idempotent** and the SDK never retries it, except for the single replay after a 403 when `getAccessToken` is set (the server rejected the token, so nothing was created). A batch stops at the first failing parcel, and parcels created before that failure remain. On `PostwayBusinessError`, look them up by `my_tracking_no` (`orderShipments.filter`) before you resubmit.
 - **`orderShipments.cancel`** matches the courier `tracking_no` only, not `my_tracking_no` or refs.
 - **`labels.orderShipments`**: each `tracking_nos` entry may be a `tracking_no`, `my_tracking_no` or `ref1..3`. If none match, the server returns 400.
 - **`thailand.filter`**: the field filters (`sub_district`, `district`, `province`, `zip_code`) are exact matches. `shipment_provider_names` restricts results to areas served by those couriers; omit it for all. The response spells the zip field `zipcode`.
@@ -180,7 +213,7 @@ The server reports errors as `{ code, isSuccess: false, message, data: null }` w
 | HTTP | Meaning                                                                                         |
 | ---- | ----------------------------------------------------------------------------------------------- |
 | 400  | Validation failure (`messages` may hold several entries) or business rule, e.g. order not found |
-| 403  | Missing, unknown or expired token                                                               |
+| 403  | Missing, unknown or expired token (with `getAccessToken`: still 403 after one refresh)          |
 | 404  | Public receipt token invalid                                                                    |
 | 500  | Server error; `messages` is a generic text                                                      |
 
@@ -226,9 +259,11 @@ interface FileHttpResponse {
 - **Headers**: `accessToken`, `tokenType` and `userAgent` are checked at construction so a pasted token with a stray line break cannot inject headers or leak into an error message.
 - **Paths**: caller-supplied path parameters are URL-encoded and may not be empty, `.` or `..`, so a bad input cannot reach a different endpoint.
 - **Redirects** are refused (`redirect: 'error'`); the API never redirects, and following one could re-send `Authorization` elsewhere.
+- **Retries**: none, except one replay of an authenticated call after a 403 when `getAccessToken` is set. Server errors, timeouts and network failures are never retried.
+- **Provider tokens** from `getAccessToken` pass the same header check before use. JWT claims are read only to time a refresh; neither tokens nor claims appear in errors.
 - **Errors** report route templates instead of parameter values, and response bodies are non-enumerable (see [Errors](#errors)).
 - The SDK has **no runtime dependencies**, never logs, and never reads environment variables.
-- The access token is held in a private field and is only sent on authenticated routes. Store it in a secret manager or environment variable, never in source control.
+- The access token is held in a private field and is only sent on authenticated routes (`getAccessToken` is never called for public ones). Store it in a secret manager or environment variable, never in source control.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
@@ -244,9 +279,10 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 ```bash
 nvm use             # Node 22 (.nvmrc); the dev toolchain needs >= 22.13
 npm ci
-npm run check       # typecheck + lint + format:check + unit tests
+npm run check       # typecheck (src, test and demo) + lint + format:check + unit tests
 npm test            # unit tests only (vitest, mocked fetch, no network)
 npm run build       # emits dist/ (ESM + .d.ts)
+npm run demo        # build, then run demo/quick-start.ts (see Demo)
 ```
 
 ```
@@ -256,6 +292,7 @@ src/types/       request/response types, one file per resource, plus enums
 src/utils/       decodeFile
 test/unit/       mirrors src/; test/unit/support holds the mocked fetch
 test/integration read-only live checks, skipped without credentials
+demo/            runnable Quick start; demo/tsconfig.json maps the package name to src/ for typechecking
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the release procedure.

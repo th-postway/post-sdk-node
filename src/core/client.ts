@@ -1,3 +1,4 @@
+import type { AccessTokenProvider } from './access-token.js';
 import { MERCHANT_BASE_URLS, type MerchantEnvironment } from './environments.js';
 import { PostwayConfigError } from './errors.js';
 import { DEFAULT_TIMEOUT_MS, defaultUserAgent, HttpClient, type FetchLike } from './http-client.js';
@@ -12,9 +13,16 @@ import { ThailandResource } from '../resources/thailand.js';
 export interface PostwayMerchantClientOptions {
   /**
    * Merchant session access token, issued to you by Postway. Required for every call except
-   * `receipts.*` and `health.ping()`.
+   * `receipts.*` and `health.ping()`. Not needed when `getAccessToken` is set.
    */
   accessToken?: string;
+  /**
+   * Supplies merchant access tokens and turns on automatic refresh. Called when there is no token yet,
+   * once ≥75% of the current token's lifetime has elapsed (from the returned `expiresAt`, else the JWT
+   * `exp`/`iat` claims, else one `auth/account/info` probe per token), and once after a 403, after
+   * which the rejected call is replayed once. Return the token, or `{ accessToken, expiresAt }`.
+   */
+  getAccessToken?: AccessTokenProvider;
   /** Token type sent before the token in `Authorization`. Default `"Bearer"`. */
   tokenType?: string;
   /**
@@ -70,9 +78,14 @@ export class PostwayMerchantClient {
       throw new PostwayConfigError('fetch must be a function');
     }
 
+    if (options.getAccessToken !== undefined && typeof options.getAccessToken !== 'function') {
+      throw new PostwayConfigError('getAccessToken must be a function');
+    }
+
     const http = new HttpClient({
       baseUrl,
       ...(options.accessToken ? { accessToken: options.accessToken } : {}),
+      ...(options.getAccessToken ? { getAccessToken: options.getAccessToken } : {}),
       tokenType: options.tokenType ?? 'Bearer',
       timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       fetch: fetchImpl,

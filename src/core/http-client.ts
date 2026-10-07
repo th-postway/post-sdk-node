@@ -1,4 +1,5 @@
 import type { HttpBaseResponse } from '../types/common.js';
+import { AccessTokenManager, type AccessTokenProvider } from './access-token.js';
 import { PostwayApiError, PostwayBusinessError, PostwayConfigError, PostwayRequestError } from './errors.js';
 import {
   assertAuthScheme,
@@ -22,6 +23,8 @@ export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 export interface HttpClientConfig {
   baseUrl: string;
   accessToken?: string;
+  /** Caller-supplied token source; turns on automatic refresh. */
+  getAccessToken?: AccessTokenProvider;
   tokenType: string;
   timeoutMs: number;
   fetch: FetchLike;
@@ -50,6 +53,8 @@ export interface HttpCall extends RequestOptions {
   body?: unknown;
   /** Send `Authorization` (authenticated routes). */
   auth: boolean;
+  /** The response carries `session.expired` for the token sent (`auth/account/info`). */
+  observesSession?: boolean;
 }
 
 export const DEFAULT_TIMEOUT_MS = 60_000;
@@ -61,6 +66,7 @@ export function defaultUserAgent(): string {
 /** Thin `fetch` wrapper: URL building, headers, timeout, body parsing and error mapping. */
 export class HttpClient {
   readonly #config: HttpClientConfig;
+  readonly #tokens: AccessTokenManager;
 
   /** @throws PostwayConfigError for an unsafe base URL, header value or timeout; never echoes the value. */
   constructor(config: HttpClientConfig) {
@@ -70,6 +76,7 @@ export class HttpClient {
     assertHeaderValue(config.userAgent, 'userAgent');
     assertTimeoutMs(config.timeoutMs);
     this.#config = { ...config, baseUrl };
+    this.#tokens = new AccessTokenManager(config.accessToken, config.getAccessToken);
   }
 
   get baseUrl(): string {
@@ -125,31 +132,48 @@ export class HttpClient {
     return body.data as T;
   }
 
-  /** `#send`, throwing `PostwayApiError` for a non-2xx status. */
+  /**
+   * `#send` with the access-token flow, throwing `PostwayApiError` for a non-2xx status. With a token
+   * provider, a 403 on an authenticated call refreshes the token once and replays the call once: the
+   * API rejects the token before running the request, so the replay cannot duplicate its effect.
+   */
   async #sendChecked(call: HttpCall): Promise<{ status: number; body: unknown; url: string }> {
-    const result = await this.#send(call);
+    let token: string | undefined;
+    let mayReplay = false;
+    if (call.auth) {
+      if (!this.#tokens.configured) {
+        throw new PostwayConfigError(
+          `${call.method} ${this.route(call.path)} requires a merchant access token; pass accessToken or getAccessToken to the client`,
+        );
+      }
+      const resolved = await this.#tokens.resolve(
+        call.observesSession ? undefined : sent => this.#send(sessionProbe(call), sent),
+      );
+      token = resolved.token;
+      mayReplay = this.#tokens.canRefresh && !resolved.refreshedAfterForbidden;
+    }
+
+    let result = await this.#send(call, token);
+    if (result.status === 403 && mayReplay && token !== undefined) {
+      token = await this.#tokens.refreshAfterForbidden(token);
+      result = await this.#send(call, token);
+    }
     if (result.status < 200 || result.status >= 300) {
       throw new PostwayApiError({ method: call.method, ...result, ...describeBody(result.body) });
     }
+    if (call.observesSession && token !== undefined) this.#tokens.observeSession(token, result.body);
     return result;
   }
 
   /** Returned `url` is the redacted route URL, not the one sent. */
-  async #send(call: HttpCall): Promise<{ status: number; body: unknown; url: string }> {
+  async #send(call: HttpCall, token: string | undefined): Promise<{ status: number; body: unknown; url: string }> {
     const url = this.url(call.path, call.query);
     const reportedUrl = this.routeUrl(call.path);
     const headers: Record<string, string> = {
       Accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
       'User-Agent': this.#config.userAgent,
     };
-    if (call.auth) {
-      if (!this.#config.accessToken) {
-        throw new PostwayConfigError(
-          `${call.method} ${this.route(call.path)} requires a merchant access token; pass accessToken to the client`,
-        );
-      }
-      headers.Authorization = `${this.#config.tokenType} ${this.#config.accessToken}`;
-    }
+    if (call.auth && token !== undefined) headers.Authorization = `${this.#config.tokenType} ${token}`;
     let payload: string | undefined;
     if (call.body !== undefined) {
       headers['Content-Type'] = 'application/json';
@@ -178,6 +202,17 @@ export class HttpClient {
     }
     return { status: response.status, body: parseBody(text, response.headers.get('content-type')), url: reportedUrl };
   }
+}
+
+/** `POST auth/account/info` with the caller's signal and timeout: learns an unknown token lifetime. */
+function sessionProbe(call: HttpCall): HttpCall {
+  return {
+    method: 'POST',
+    path: ['auth', 'account', 'info'],
+    auth: true,
+    signal: call.signal,
+    timeoutMs: call.timeoutMs,
+  };
 }
 
 function parseBody(text: string, contentType: string | null): unknown {

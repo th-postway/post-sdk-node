@@ -13,7 +13,7 @@ TypeScript SDK for the Postway Merchant API. ESM-only, **zero runtime dependenci
 
 ```
 src/index.ts          public surface; export * from the four folder barrels below
-src/core/             client.ts, http-client.ts, errors.ts, environments.ts, validation.ts, version.ts
+src/core/             client.ts, http-client.ts, access-token.ts, errors.ts, environments.ts, validation.ts, version.ts
 src/resources/        one class per API area, kebab-case plural (order-shipments.ts)
 src/types/            one type file per resource with the same name, plus enums.ts and common.ts
 src/utils/            decode-file.ts
@@ -38,7 +38,7 @@ test/integration      live, read-only
 - `PostwayConfigError` messages never include the offending value.
 - Caller-supplied path segments are wrapped in `param(name, value)` so they are validated and appear as `:name` in error URLs and messages.
 - All header values pass through `src/core/validation.ts`. `baseUrl` must be https (http only for loopback), with no credentials, query or fragment.
-- `redirect: 'error'` stays. No retries on non-idempotent calls.
+- `redirect: 'error'` stays. No retries, except the single replay of an authenticated call after a 403 when `getAccessToken` refreshed the token (`src/core/access-token.ts`).
 - No `console.*`, no `process.env` reads in `src/`.
 - No tokens, tracking numbers, refs or response bodies in error messages. `PostwayApiError.body` stays non-enumerable.
 - No internal infrastructure names (hosts, ports, service/framework names, private package names) anywhere in code, comments, tests or docs. Public hosts are only the two in `src/core/environments.ts`.

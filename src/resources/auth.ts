@@ -7,6 +7,12 @@ export class AuthResource {
 
   /** The store, owner and session expiry behind the access token. `POST auth/account/info`. */
   accountInfo(options?: RequestOptions): Promise<MerchantAuthAccountInfoResponse> {
-    return this.http.request({ ...options, method: 'POST', path: ['auth', 'account', 'info'], auth: true });
+    return this.http.request({
+      ...options,
+      method: 'POST',
+      path: ['auth', 'account', 'info'],
+      auth: true,
+      observesSession: true,
+    });
   }
 }
