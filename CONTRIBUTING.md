@@ -58,9 +58,34 @@ POSTWAY_MERCHANT_ACCESS_TOKEN=... \
 npm run test:integration
 ```
 
-## Releasing
+## Branches and releases
 
-1. Bump `version` in `package.json` and `SDK_VERSION` in `src/core/version.ts`.
-2. Move the `Unreleased` entries in `CHANGELOG.md` under the new version with today's date.
-3. Commit, then tag and push: `git tag v22.x.y && git push origin main v22.x.y`.
-4. The `Publish` workflow verifies the tag matches the version, runs `npm run check`, and publishes with npm provenance. It needs an `NPM_TOKEN` repository secret (granular token with publish rights). Once the package exists on npm, switch to npm trusted publishing (OIDC) and drop the secret.
+The repository uses git-flow with its default settings (no tag prefix):
+
+| Branch                  | Purpose                                               |
+| ----------------------- | ----------------------------------------------------- |
+| `main`                  | released code; every release is a tag on it           |
+| `develop`               | integration branch; open pull requests against it     |
+| `feature/*`, `bugfix/*` | work branches, started from `develop`                 |
+| `release/<version>`     | release preparation, started from `develop`           |
+| `hotfix/<version>`      | urgent fix to a released version, started from `main` |
+
+Versions are SemVer `MAJOR.MINOR.PATCH` with **no `v` prefix**, used as is in branch and tag names: `release/22.1.0` becomes tag `22.1.0`. The major stays `22`.
+
+CI (`.github/workflows/ci.yml`) runs on pushes to `main`, `develop`, `release/**` and `hotfix/**`, and on every pull request. On `release/*` and `hotfix/*` it also fails unless the branch name is `MAJOR.MINOR.PATCH` and equals `version` in `package.json`. Dependabot opens its pull requests against `develop`.
+
+### Releasing
+
+1. `git flow release start 22.x.y` (from `develop`).
+2. Bump `version` in `package.json` and `SDK_VERSION` in `src/core/version.ts`, move the `Unreleased` entries in `CHANGELOG.md` under `[22.x.y]` with today's date, and commit.
+3. `git push -u origin release/22.x.y` and wait for CI.
+4. `git flow release finish 22.x.y`: merges into `main`, tags `22.x.y` there, and merges back into `develop`.
+5. `git push --atomic origin main develop 22.x.y`, then delete `release/22.x.y` on the remote if it is still there.
+
+For an urgent fix, run the same steps with `git flow hotfix start 22.x.y` (from `main`) and `git flow hotfix finish 22.x.y`.
+
+The `Publish` workflow (`.github/workflows/publish.yml`) runs only for tags matching `MAJOR.MINOR.PATCH`; a `v`-prefixed or pre-release tag does not start it. It checks that the tag is on `main` and equals `version` in `package.json`, runs `npm run check`, and publishes with npm provenance.
+
+GitHub setup: an `npm` environment and an `NPM_TOKEN` secret (granular token with publish rights). Limit the environment's deployment tags to `[0-9]*.[0-9]*.[0-9]*`. Once the package exists on npm, switch to npm trusted publishing (OIDC) and drop the secret.
+
+Never move or reuse a published tag. If `Publish` fails for a transient reason, re-run it; otherwise fix forward with a hotfix and the next patch version.
