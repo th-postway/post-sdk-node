@@ -13,7 +13,13 @@ export class LabelsResource {
    * @throws PostwayApiError (400) when none of `tracking_nos` matches a parcel of the store.
    */
   orderShipments(request: MerchantLabelOrderShipmentsRequest, options?: RequestOptions): Promise<FileHttpResponse> {
-    return this.http.request({ ...options, method: 'POST', path: ['label', 'order', 'shipments'], body: request, auth: true });
+    return this.http.request({
+      ...options,
+      method: 'POST',
+      path: ['label', 'order', 'shipments'],
+      body: request,
+      auth: true,
+    });
   }
 
   /** A printable receipt by receipt number. `GET label/receipt/:receipt_no?receipt_size=`. */

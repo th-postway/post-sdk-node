@@ -166,7 +166,9 @@ function describeBody(body: unknown): { code?: number; messages: string[] } {
 
 function toRequestError(method: string, url: string, error: unknown, timedOutAfterMs?: number): PostwayRequestError {
   if (timedOutAfterMs !== undefined) {
-    return new PostwayRequestError(method, url, `${method} ${url} timed out after ${timedOutAfterMs} ms`, { cause: error });
+    return new PostwayRequestError(method, url, `${method} ${url} timed out after ${timedOutAfterMs} ms`, {
+      cause: error,
+    });
   }
   const reason = error instanceof Error ? error.message : String(error);
   return new PostwayRequestError(method, url, `${method} ${url} failed: ${reason}`, { cause: error });

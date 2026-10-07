@@ -21,8 +21,8 @@ TypeScript SDK for the **Postway Merchant API**: create and track parcels, quote
 The package is ESM-only (`"type": "module"`), and `import` works on every Node 22.x. Node 22.12 is the first LTS release where `require()` of an ES module works without a flag, so CommonJS callers need Node ≥ 22.12. One build serves both module systems:
 
 ```js
-import { PostwayMerchantClient } from '@th-postway/post-sdk';        // ESM
-const { PostwayMerchantClient } = require('@th-postway/post-sdk');   // CommonJS, Node >= 22.12
+import { PostwayMerchantClient } from '@th-postway/post-sdk'; // ESM
+const { PostwayMerchantClient } = require('@th-postway/post-sdk'); // CommonJS, Node >= 22.12
 ```
 
 Types resolve through the `exports` map under both `moduleResolution: "nodenext"` and `"bundler"`.
@@ -41,7 +41,7 @@ import { writeFile } from 'node:fs/promises';
 
 const postway = new PostwayMerchantClient({
   accessToken: process.env.POSTWAY_ACCESS_TOKEN, // never hardcode it
-  environment: 'production',                     // default
+  environment: 'production', // default
 });
 
 const account = await postway.auth.accountInfo();
@@ -49,8 +49,24 @@ console.log(account.store.name, 'token expires', account.session.expired);
 
 const [parcel] = await postway.orderShipments.create({
   shipping: { shipment_provider_name: 'Flash', my_tracking_no: 'ORDER-1001' },
-  sender: { fullname: 'My Shop', mobile_phone: '0811111111', address: '1 Silom Rd', sub_district: 'สีลม', district: 'บางรัก', province: 'กรุงเทพมหานคร', zip_code: '10500' },
-  recipient: { fullname: 'Customer', mobile_phone: '0822222222', address: '2 Nimman Rd', sub_district: 'สุเทพ', district: 'เมืองเชียงใหม่', province: 'เชียงใหม่', zip_code: '50200' },
+  sender: {
+    fullname: 'My Shop',
+    mobile_phone: '0811111111',
+    address: '1 Silom Rd',
+    sub_district: 'สีลม',
+    district: 'บางรัก',
+    province: 'กรุงเทพมหานคร',
+    zip_code: '10500',
+  },
+  recipient: {
+    fullname: 'Customer',
+    mobile_phone: '0822222222',
+    address: '2 Nimman Rd',
+    sub_district: 'สุเทพ',
+    district: 'เมืองเชียงใหม่',
+    province: 'เชียงใหม่',
+    zip_code: '50200',
+  },
   package: { insurance_value: 0, weight: 500, width: 10, length: 20, height: 5 },
   product_cods: [], // empty = not COD
 });
@@ -78,13 +94,13 @@ Authorization: Bearer <accessToken>
 
 ## Environments
 
-| `environment` | Base URL |
-| --- | --- |
-| `production` *(default)* | `https://post.postway.co.th/merchant` |
-| `staging` | `https://post.postway.co.th/merchant/stg` |
-| `development` | `https://post.postway.co.th/merchant/dev` |
-| `sandbox` | `https://sandbox-post.postway.co.th/merchant` (backed by the development deployment) |
-| `local` | `http://localhost:3000/api` |
+| `environment`            | Base URL                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| `production` _(default)_ | `https://post.postway.co.th/merchant`                                                |
+| `staging`                | `https://post.postway.co.th/merchant/stg`                                            |
+| `development`            | `https://post.postway.co.th/merchant/dev`                                            |
+| `sandbox`                | `https://sandbox-post.postway.co.th/merchant` (backed by the development deployment) |
+| `local`                  | `http://localhost:3000/api`                                                          |
 
 The cluster ingress rewrites `/merchant/<path>` to the service's `/api/<path>`, which is why public URLs have no `/api` segment. When you run the Nest `merchant` app yourself (`MERCHANT_PORT`, default 3000) the routes live under `/api`. Its Swagger UI is at `/docs`.
 
@@ -96,15 +112,15 @@ new PostwayMerchantClient({ baseUrl: 'http://localhost:3006/api', accessToken })
 
 ### Client options
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| `accessToken` | — | Merchant session token |
-| `tokenType` | `"Bearer"` | First word of `Authorization` |
-| `environment` | `"production"` | See table above |
-| `baseUrl` | from `environment` | Absolute URL; trailing `/` ignored |
-| `timeoutMs` | `60000` | Per request; override per call with `{ timeoutMs }` |
-| `fetch` | `globalThis.fetch` | Inject for proxies, tracing or tests |
-| `userAgent` | `postway-sdk-node/<ver> node/<ver>` | |
+| Option        | Default                             | Notes                                               |
+| ------------- | ----------------------------------- | --------------------------------------------------- |
+| `accessToken` | —                                   | Merchant session token                              |
+| `tokenType`   | `"Bearer"`                          | First word of `Authorization`                       |
+| `environment` | `"production"`                      | See table above                                     |
+| `baseUrl`     | from `environment`                  | Absolute URL; trailing `/` ignored                  |
+| `timeoutMs`   | `60000`                             | Per request; override per call with `{ timeoutMs }` |
+| `fetch`       | `globalThis.fetch`                  | Inject for proxies, tracing or tests                |
+| `userAgent`   | `postway-sdk-node/<ver> node/<ver>` |                                                     |
 
 Every method takes a final `options` argument: `{ signal?: AbortSignal, timeoutMs?: number }`.
 
@@ -112,23 +128,23 @@ Every method takes a final `options` argument: `{ signal?: AbortSignal, timeoutM
 
 Paths are relative to the base URL.
 
-| Method | HTTP | Auth | Returns |
-| --- | --- | --- | --- |
-| `auth.accountInfo()` | `POST auth/account/info` | ✓ | `MerchantAuthAccountInfoResponse`: store, owner, `session.expired` |
-| `orderShipments.getByTrackingNo(trackingNo)` | `GET order-shipment/get-by-tracking-no/:tracking_no` | ✓ | `MerchantOrderShipmentData \| null` |
-| `orderShipments.getByRef(ref)` | `GET order-shipment/get-by-ref/:ref` | ✓ | `MerchantOrderShipmentData \| null`; matches `ref1`, `ref2` or `ref3` |
-| `orderShipments.filter({ filter?, page, limit })` | `POST order-shipment/filter` | ✓ | `FilterResponse<MerchantOrderShipmentData>`, newest first |
-| `orderShipments.create(request \| request[])` | `POST order-shipment/create` | ✓ | `MerchantOrderShipmentData[]` |
-| `orderShipments.calculatePrice(request)` | `POST order-shipment/calculate-price` | ✓ | `{ price_infos, plan_detail }` |
-| `orderShipments.cancel(trackingNo)` | `POST order-shipment/cancel` | ✓ | `void` |
-| `shipmentProviders.all()` | `GET shipment-provider/all` | ✓ | `MerchantShipmentProviderData[]`: couriers this store may use |
-| `thailand.filter({ page, limit, ... })` | `POST thailand/filter` | ✓ | `FilterResponse<MerchantThailand>` |
-| `labels.orderShipments({ tracking_nos, label_size, label_orientation })` | `POST label/order/shipments` | ✓ | `FileHttpResponse` (base64) |
-| `labels.receipt(receiptNo, { receiptSize? })` | `GET label/receipt/:receipt_no?receipt_size=` | ✓ | `FileHttpResponse` (base64) |
-| `receipts.getPublic(token)` | `GET receipt/public/:token` | — | `PublicReceiptResponse` |
-| `receipts.getPublicHtml(token)` | `GET receipt/:token` | — | HTML `string` |
-| `receipts.publicUrl(token)` | *(no request)* | — | URL of the public receipt page |
-| `health.ping()` | `GET health/ping` | — | `"pong"` |
+| Method                                                                   | HTTP                                                 | Auth | Returns                                                               |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| `auth.accountInfo()`                                                     | `POST auth/account/info`                             | ✓    | `MerchantAuthAccountInfoResponse`: store, owner, `session.expired`    |
+| `orderShipments.getByTrackingNo(trackingNo)`                             | `GET order-shipment/get-by-tracking-no/:tracking_no` | ✓    | `MerchantOrderShipmentData \| null`                                   |
+| `orderShipments.getByRef(ref)`                                           | `GET order-shipment/get-by-ref/:ref`                 | ✓    | `MerchantOrderShipmentData \| null`; matches `ref1`, `ref2` or `ref3` |
+| `orderShipments.filter({ filter?, page, limit })`                        | `POST order-shipment/filter`                         | ✓    | `FilterResponse<MerchantOrderShipmentData>`, newest first             |
+| `orderShipments.create(request \| request[])`                            | `POST order-shipment/create`                         | ✓    | `MerchantOrderShipmentData[]`                                         |
+| `orderShipments.calculatePrice(request)`                                 | `POST order-shipment/calculate-price`                | ✓    | `{ price_infos, plan_detail }`                                        |
+| `orderShipments.cancel(trackingNo)`                                      | `POST order-shipment/cancel`                         | ✓    | `void`                                                                |
+| `shipmentProviders.all()`                                                | `GET shipment-provider/all`                          | ✓    | `MerchantShipmentProviderData[]`: couriers this store may use         |
+| `thailand.filter({ page, limit, ... })`                                  | `POST thailand/filter`                               | ✓    | `FilterResponse<MerchantThailand>`                                    |
+| `labels.orderShipments({ tracking_nos, label_size, label_orientation })` | `POST label/order/shipments`                         | ✓    | `FileHttpResponse` (base64)                                           |
+| `labels.receipt(receiptNo, { receiptSize? })`                            | `GET label/receipt/:receipt_no?receipt_size=`        | ✓    | `FileHttpResponse` (base64)                                           |
+| `receipts.getPublic(token)`                                              | `GET receipt/public/:token`                          | —    | `PublicReceiptResponse`                                               |
+| `receipts.getPublicHtml(token)`                                          | `GET receipt/:token`                                 | —    | HTML `string`                                                         |
+| `receipts.publicUrl(token)`                                              | _(no request)_                                       | —    | URL of the public receipt page                                        |
+| `health.ping()`                                                          | `GET health/ping`                                    | —    | `"pong"`                                                              |
 
 Behaviour worth knowing:
 
@@ -143,28 +159,30 @@ Enums such as `LabelSize`, `LabelOrientation`, `ReceiptSize`, `FlashArticleCateg
 
 ```ts
 import { OrderShipmentStatus } from '@th-postway/post-sdk';
-if (parcel.order_shipment_status === OrderShipmentStatus.InTransit) { /* 'In-Transit' */ }
+if (parcel.order_shipment_status === OrderShipmentStatus.InTransit) {
+  /* 'In-Transit' */
+}
 ```
 
 ## Errors
 
 All errors extend `PostwayError`.
 
-| Class | When | Useful fields |
-| --- | --- | --- |
-| `PostwayApiError` | Non-2xx response | `status`, `code`, `messages[]`, `body`, `method`, `url` |
-| `PostwayBusinessError` *(extends `PostwayApiError`)* | 2xx response whose envelope says `isSuccess: false` | same |
-| `PostwayRequestError` | Network failure, abort or timeout; nothing came back | `cause`, `method`, `url` |
-| `PostwayConfigError` | Invalid client options, or a guarded call without a token | — |
+| Class                                                | When                                                      | Useful fields                                           |
+| ---------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| `PostwayApiError`                                    | Non-2xx response                                          | `status`, `code`, `messages[]`, `body`, `method`, `url` |
+| `PostwayBusinessError` _(extends `PostwayApiError`)_ | 2xx response whose envelope says `isSuccess: false`       | same                                                    |
+| `PostwayRequestError`                                | Network failure, abort or timeout; nothing came back      | `cause`, `method`, `url`                                |
+| `PostwayConfigError`                                 | Invalid client options, or a guarded call without a token | —                                                       |
 
 The server reports errors as `{ code, isSuccess: false, message, data: null }` with the real HTTP status:
 
-| HTTP | Meaning |
-| --- | --- |
-| 400 | Validation failure (`messages` may hold several entries) or business rule, e.g. order not found |
-| 403 | Missing, unknown or expired token |
-| 404 | Public receipt token invalid |
-| 500 | Server error; `messages` is a generic text |
+| HTTP | Meaning                                                                                         |
+| ---- | ----------------------------------------------------------------------------------------------- |
+| 400  | Validation failure (`messages` may hold several entries) or business rule, e.g. order not found |
+| 403  | Missing, unknown or expired token                                                               |
+| 404  | Public receipt token invalid                                                                    |
+| 500  | Server error; `messages` is a generic text                                                      |
 
 `code` in the body is **400 or 500**, not the HTTP status. Use `status` to branch.
 
@@ -187,7 +205,12 @@ try {
 Label and receipt endpoints return JSON, not raw bytes:
 
 ```ts
-interface FileHttpResponse { file_name: string; content: string /* base64 */; content_type: string; content_length: number }
+interface FileHttpResponse {
+  file_name: string;
+  content: string /* base64 */;
+  content_type: string;
+  content_length: number;
+}
 ```
 
 `decodeFile(file)` returns a `Buffer`.
@@ -226,12 +249,12 @@ The request and response types mirror `post-api` `libs/data/src/models/view-mode
 
 ## Mapping from the .NET SDK
 
-| `Postway.Post` (.NET) | This SDK |
-| --- | --- |
-| `Auth_AccountInfo()` | `auth.accountInfo()` |
-| `OrderShipment_GetByTrackingNo(trackingNo)` | `orderShipments.getByTrackingNo(trackingNo)` |
-| `OrderShipment_GetByRef(refNo)` | `orderShipments.getByRef(ref)` |
-| `Label_OrderShipment(request)` | `labels.orderShipments(request)` |
-| — | `orderShipments.filter / create / calculatePrice / cancel`, `shipmentProviders.all`, `thailand.filter`, `labels.receipt`, `receipts.*`, `health.ping` |
+| `Postway.Post` (.NET)                       | This SDK                                                                                                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Auth_AccountInfo()`                        | `auth.accountInfo()`                                                                                                                                  |
+| `OrderShipment_GetByTrackingNo(trackingNo)` | `orderShipments.getByTrackingNo(trackingNo)`                                                                                                          |
+| `OrderShipment_GetByRef(refNo)`             | `orderShipments.getByRef(ref)`                                                                                                                        |
+| `Label_OrderShipment(request)`              | `labels.orderShipments(request)`                                                                                                                      |
+| —                                           | `orderShipments.filter / create / calculatePrice / cancel`, `shipmentProviders.all`, `thailand.filter`, `labels.receipt`, `receipts.*`, `health.ping` |
 
 Both SDKs default to `https://post.postway.co.th/merchant`.

@@ -41,7 +41,13 @@ export class OrderShipmentsResource {
     request: MerchantOrderShipmentFilterRequest,
     options?: RequestOptions,
   ): Promise<FilterResponse<MerchantOrderShipmentData>> {
-    return this.http.request({ ...options, method: 'POST', path: ['order-shipment', 'filter'], body: request, auth: true });
+    return this.http.request({
+      ...options,
+      method: 'POST',
+      path: ['order-shipment', 'filter'],
+      body: request,
+      auth: true,
+    });
   }
 
   /**
@@ -60,7 +66,13 @@ export class OrderShipmentsResource {
     options?: RequestOptions,
   ): Promise<MerchantOrderShipmentData[]> {
     const body = Array.isArray(requests) ? requests : [requests];
-    return this.http.requestEnvelope({ ...options, method: 'POST', path: ['order-shipment', 'create'], body, auth: true });
+    return this.http.requestEnvelope({
+      ...options,
+      method: 'POST',
+      path: ['order-shipment', 'create'],
+      body,
+      auth: true,
+    });
   }
 
   /** Quote the price of one parcel without creating it. `POST order-shipment/calculate-price`. */

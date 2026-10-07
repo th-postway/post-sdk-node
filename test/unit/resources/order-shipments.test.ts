@@ -126,7 +126,16 @@ describe('orderShipments', () => {
 
   it('calculatePrice → POST order-shipment/calculate-price', async () => {
     const quote = {
-      price_infos: [{ description: 'ค่าขนส่ง', price: 35, cost: 25, cashback_cost: 0, is_reward_cashback: false, total_affliliate: 0 }],
+      price_infos: [
+        {
+          description: 'ค่าขนส่ง',
+          price: 35,
+          cost: 25,
+          cashback_cost: 0,
+          is_reward_cashback: false,
+          total_affliliate: 0,
+        },
+      ],
       plan_detail: { region: 'UPC', type: 'weight', min_boundary: 0, max_boundary: 1000 },
     };
     const request = {
@@ -144,7 +153,11 @@ describe('orderShipments', () => {
     };
     const { client, calls } = setup([json(quote, 201)]);
     await expect(client.orderShipments.calculatePrice(request)).resolves.toEqual(quote);
-    expect(only(calls)).toMatchObject({ method: 'POST', url: `${BASE_URL}/order-shipment/calculate-price`, body: request });
+    expect(only(calls)).toMatchObject({
+      method: 'POST',
+      url: `${BASE_URL}/order-shipment/calculate-price`,
+      body: request,
+    });
   });
 
   it('cancel → POST order-shipment/cancel with { tracking_no }', async () => {

@@ -23,7 +23,10 @@ export class ReceiptsResource {
    * @throws PostwayApiError (404) when the token is invalid; its `body` holds the "not found" page.
    */
   async getPublicHtml(token: string, options?: RequestOptions): Promise<string> {
-    return (await this.http.request<string | null>({ ...options, method: 'GET', path: ['receipt', token], auth: false })) ?? '';
+    return (
+      (await this.http.request<string | null>({ ...options, method: 'GET', path: ['receipt', token], auth: false })) ??
+      ''
+    );
   }
 
   /** The URL of the public receipt page, e.g. to show or encode as a QR code. */

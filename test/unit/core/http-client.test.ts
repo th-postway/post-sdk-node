@@ -52,7 +52,9 @@ describe('HTTP layer', () => {
 
   it('keeps every ValidationPipe message', async () => {
     const { client } = setup([apiError(400, ['limit must not be less than 1', 'page should not be empty'])]);
-    const error = (await client.orderShipments.filter({ page: 0, limit: 0 }).catch((e: unknown) => e)) as PostwayApiError;
+    const error = (await client.orderShipments
+      .filter({ page: 0, limit: 0 })
+      .catch((e: unknown) => e)) as PostwayApiError;
     expect(error.messages).toEqual(['limit must not be less than 1', 'page should not be empty']);
     expect(error.message).toBe('limit must not be less than 1; page should not be empty');
   });

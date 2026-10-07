@@ -5,11 +5,20 @@ import { BASE_URL, TOKEN, json, only, setup } from '../support/mock-fetch.js';
 const AUTH = `Bearer ${TOKEN}`;
 
 describe('labels', () => {
-  const file = { file_name: 'label.pdf', content: Buffer.from('%PDF-1.7').toString('base64'), content_type: 'application/pdf', content_length: 8 };
+  const file = {
+    file_name: 'label.pdf',
+    content: Buffer.from('%PDF-1.7').toString('base64'),
+    content_type: 'application/pdf',
+    content_length: 8,
+  };
 
   it('orderShipments → POST label/order/shipments, decodable with decodeFile', async () => {
     const { client, calls } = setup([json(file, 201)]);
-    const request = { tracking_nos: ['TH0001', 'SHOP-2'], label_size: LabelSize.Size4x6, label_orientation: LabelOrientation.Portrait };
+    const request = {
+      tracking_nos: ['TH0001', 'SHOP-2'],
+      label_size: LabelSize.Size4x6,
+      label_orientation: LabelOrientation.Portrait,
+    };
     const result = await client.labels.orderShipments(request);
     expect(only(calls)).toMatchObject({ method: 'POST', url: `${BASE_URL}/label/order/shipments`, body: request });
     expect(decodeFile(result).toString()).toBe('%PDF-1.7');
