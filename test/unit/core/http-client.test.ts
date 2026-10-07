@@ -8,11 +8,42 @@ import {
 } from '../../../src/index.js';
 import { BASE_URL, apiError, json, only, setup, text } from '../support/mock-fetch.js';
 
+/** A fetch that never resolves and rejects with the abort reason once the signal fires. */
+const hanging = (_url: string, init: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+  });
+
 describe('HTTP layer', () => {
   it('encodes path parameters', async () => {
     const { client, calls } = setup([json(null)]);
     await client.orderShipments.getByRef('A/B ?#1');
     expect(only(calls).url).toBe(`${BASE_URL}/order-shipment/get-by-ref/A%2FB%20%3F%231`);
+  });
+
+  it('keeps dots inside a path parameter', async () => {
+    const { client, calls } = setup([json({})], { accessToken: undefined });
+    await client.receipts.getPublic('abc.def');
+    expect(only(calls).url).toBe(`${BASE_URL}/receipt/public/abc.def`);
+  });
+
+  it.each([
+    ['an empty string', ''],
+    ['"."', '.'],
+    ['".."', '..'],
+  ])('rejects %s as a path parameter before any request', async (_label, value) => {
+    const { client, fetch } = setup();
+    await expect(client.orderShipments.getByRef(value)).rejects.toBeInstanceOf(PostwayConfigError);
+    await expect(client.orderShipments.getByTrackingNo(value)).rejects.toBeInstanceOf(PostwayConfigError);
+    await expect(client.labels.receipt(value)).rejects.toBeInstanceOf(PostwayConfigError);
+    await expect(client.receipts.getPublic(value)).rejects.toBeInstanceOf(PostwayConfigError);
+    await expect(client.receipts.getPublicHtml(value)).rejects.toBeInstanceOf(PostwayConfigError);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('publicUrl rejects ".." synchronously', () => {
+    const { client } = setup();
+    expect(() => client.receipts.publicUrl('..')).toThrow(PostwayConfigError);
   });
 
   it('sets Content-Type only when there is a body', async () => {
@@ -24,9 +55,17 @@ describe('HTTP layer', () => {
     expect(calls[1]!.headers).not.toHaveProperty('Content-Type');
   });
 
+  it('refuses to follow redirects', async () => {
+    const { client, calls } = setup([text('pong')]);
+    await client.health.ping();
+    expect(only(calls).redirect).toBe('error');
+  });
+
   it('refuses a guarded call without an access token, before any request', async () => {
     const { client, fetch } = setup([], { accessToken: undefined });
-    await expect(client.auth.accountInfo()).rejects.toBeInstanceOf(PostwayConfigError);
+    const error = (await client.auth.accountInfo().catch((e: unknown) => e)) as PostwayConfigError;
+    expect(error).toBeInstanceOf(PostwayConfigError);
+    expect(error.message).toMatch(/^POST auth\/account\/info requires a merchant access token/);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -50,7 +89,7 @@ describe('HTTP layer', () => {
     });
   });
 
-  it('keeps every ValidationPipe message', async () => {
+  it('keeps every validation message', async () => {
     const { client } = setup([apiError(400, ['limit must not be less than 1', 'page should not be empty'])]);
     const error = (await client.orderShipments
       .filter({ page: 0, limit: 0 })
@@ -67,6 +106,30 @@ describe('HTTP layer', () => {
     expect(error.code).toBeUndefined();
   });
 
+  it('keeps the response body readable but non-enumerable', async () => {
+    const body = { code: 400, isSuccess: false, message: 'ไม่พบคำสั่งซื้อ', data: null, trace: 'internal-detail' };
+    const { client } = setup([json(body, 400)]);
+    const error = (await client.shipmentProviders.all().catch((e: unknown) => e)) as PostwayApiError;
+    expect(error.body).toEqual(body);
+    expect(Object.keys(error)).not.toContain('body');
+    expect(JSON.stringify(error)).not.toContain('internal-detail');
+  });
+
+  it('reports the route template instead of the receipt token in API errors', async () => {
+    const { client } = setup([apiError(404, 'ไม่พบใบเสร็จ')], { accessToken: undefined });
+    const error = (await client.receipts.getPublic('secret-token').catch((e: unknown) => e)) as PostwayApiError;
+    expect(error.url).toBe(`${BASE_URL}/receipt/public/:token`);
+    expect(error.message).not.toContain('secret-token');
+    expect(JSON.stringify(error)).not.toContain('secret-token');
+  });
+
+  it('reports the route template for tracking-number lookups', async () => {
+    const { client } = setup([apiError(400, 'ไม่พบคำสั่งซื้อ')]);
+    const error = (await client.orderShipments.getByTrackingNo('TH0001').catch((e: unknown) => e)) as PostwayApiError;
+    expect(error.url).toBe(`${BASE_URL}/order-shipment/get-by-tracking-no/:tracking_no`);
+    expect(JSON.stringify(error)).not.toContain('TH0001');
+  });
+
   it('turns a 2xx envelope with isSuccess:false into PostwayBusinessError', async () => {
     const { client } = setup([json({ code: 400, isSuccess: false, message: 'ยอดเงินไม่พอ', data: null }, 201)]);
     const error = await client.orderShipments.cancel('TH1').catch((e: unknown) => e);
@@ -79,31 +142,26 @@ describe('HTTP layer', () => {
     await expect(client.orderShipments.cancel('TH1')).rejects.toThrow(/expected \{ code, isSuccess/);
   });
 
-  it('wraps network failures in PostwayRequestError with the cause', async () => {
+  it('wraps network failures in PostwayRequestError with the cause and a redacted URL', async () => {
     const cause = new TypeError('fetch failed');
     const client = new PostwayMerchantClient({
       baseUrl: BASE_URL,
-      accessToken: 't',
       fetch: async () => {
         throw cause;
       },
     });
-    const error = (await client.health.ping().catch((e: unknown) => e)) as PostwayRequestError;
+    const error = (await client.receipts.getPublic('secret-token').catch((e: unknown) => e)) as PostwayRequestError;
     expect(error).toBeInstanceOf(PostwayRequestError);
     expect(error.cause).toBe(cause);
-    expect(error.message).toContain('fetch failed');
+    expect(error.url).toBe(`${BASE_URL}/receipt/public/:token`);
+    expect(error.message).toBe(`GET ${BASE_URL}/receipt/public/:token failed: fetch failed`);
   });
 
-  it('times out with PostwayRequestError', async () => {
-    const client = new PostwayMerchantClient({
-      baseUrl: BASE_URL,
-      timeoutMs: 20,
-      fetch: (_url, init) =>
-        new Promise((_resolve, reject) => {
-          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
-        }),
-    });
-    await expect(client.health.ping()).rejects.toThrow(/timed out after 20 ms/);
+  it('times out with PostwayRequestError and a redacted URL', async () => {
+    const client = new PostwayMerchantClient({ baseUrl: BASE_URL, timeoutMs: 20, fetch: hanging });
+    await expect(client.receipts.getPublic('secret-token')).rejects.toThrow(
+      `GET ${BASE_URL}/receipt/public/:token timed out after 20 ms`,
+    );
   });
 
   it('honours a caller AbortSignal and a per-call timeout', async () => {
@@ -111,11 +169,9 @@ describe('HTTP layer', () => {
     let seen: AbortSignal | undefined;
     const client = new PostwayMerchantClient({
       baseUrl: BASE_URL,
-      fetch: (_url, init) => {
+      fetch: (url, init) => {
         seen = init.signal ?? undefined;
-        return new Promise((_resolve, reject) => {
-          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
-        });
+        return hanging(url, init);
       },
     });
     const pending = client.health.ping({ signal: controller.signal, timeoutMs: 10_000 });
@@ -124,5 +180,11 @@ describe('HTTP layer', () => {
     expect(error).toBeInstanceOf(PostwayRequestError);
     expect(error.message).toContain('user cancelled');
     expect(seen?.aborted).toBe(true);
+  });
+
+  it.each([0, 1.5, -1, Number.NaN])('rejects a per-call timeoutMs of %s before any request', async timeoutMs => {
+    const { client, fetch } = setup();
+    await expect(client.health.ping({ timeoutMs })).rejects.toBeInstanceOf(PostwayConfigError);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

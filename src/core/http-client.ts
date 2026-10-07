@@ -1,5 +1,12 @@
-import { PostwayApiError, PostwayBusinessError, PostwayConfigError, PostwayRequestError } from './errors.js';
 import type { HttpBaseResponse } from '../types/common.js';
+import { PostwayApiError, PostwayBusinessError, PostwayConfigError, PostwayRequestError } from './errors.js';
+import {
+  assertAuthScheme,
+  assertHeaderValue,
+  assertPathSegment,
+  assertTimeoutMs,
+  normalizeBaseUrl,
+} from './validation.js';
 import { SDK_VERSION } from './version.js';
 
 /** Per-call options accepted by every SDK method. */
@@ -21,11 +28,24 @@ export interface HttpClientConfig {
   userAgent: string;
 }
 
+/** A caller-supplied path segment. `value` goes on the wire; errors show `:name` instead. */
+export interface PathParam {
+  readonly name: string;
+  readonly value: string;
+}
+
+export type PathSegment = string | PathParam;
+
+/** Mark a path segment as caller input so it is validated and redacted from error messages. */
+export function param(name: string, value: string): PathParam {
+  return { name, value };
+}
+
 /** Describes one HTTP call relative to the base URL. */
 export interface HttpCall extends RequestOptions {
   method: 'GET' | 'POST';
-  /** Path segments; each is URL-encoded and joined with `/`. */
-  path: readonly string[];
+  /** Path segments; each is validated, URL-encoded and joined with `/`. Wrap caller input in `param()`. */
+  path: readonly PathSegment[];
   query?: Record<string, string | undefined>;
   body?: unknown;
   /** Send `Authorization` (authenticated routes). */
@@ -42,23 +62,44 @@ export function defaultUserAgent(): string {
 export class HttpClient {
   readonly #config: HttpClientConfig;
 
+  /** @throws PostwayConfigError for an unsafe base URL, header value or timeout; never echoes the value. */
   constructor(config: HttpClientConfig) {
-    this.#config = { ...config, baseUrl: config.baseUrl.replace(/\/+$/, '') };
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    if (config.accessToken !== undefined) assertHeaderValue(config.accessToken, 'accessToken');
+    assertAuthScheme(config.tokenType);
+    assertHeaderValue(config.userAgent, 'userAgent');
+    assertTimeoutMs(config.timeoutMs);
+    this.#config = { ...config, baseUrl };
   }
 
   get baseUrl(): string {
     return this.#config.baseUrl;
   }
 
-  /** Absolute URL for a call (path segments encoded, empty query values dropped). */
-  url(path: readonly string[], query?: Record<string, string | undefined>): string {
-    const url = `${this.#config.baseUrl}/${path.map(encodeURIComponent).join('/')}`;
+  /** Absolute URL for a call (segments validated and encoded, empty query values dropped). */
+  url(path: readonly PathSegment[], query?: Record<string, string | undefined>): string {
+    const segments = path.map(segment => {
+      const [name, value] = typeof segment === 'string' ? ['path segment', segment] : [segment.name, segment.value];
+      assertPathSegment(value, name);
+      return encodeURIComponent(value);
+    });
+    const url = `${this.#config.baseUrl}/${segments.join('/')}`;
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined && value !== '') params.append(key, value);
     }
     const search = params.toString();
     return search ? `${url}?${search}` : url;
+  }
+
+  /** Route template of a call, e.g. `receipt/public/:token`: static segments verbatim, params as `:name`. */
+  route(path: readonly PathSegment[]): string {
+    return path.map(segment => (typeof segment === 'string' ? segment : `:${segment.name}`)).join('/');
+  }
+
+  /** `baseUrl/route`: the URL reported in errors, so caller-supplied values never reach logs. */
+  routeUrl(path: readonly PathSegment[]): string {
+    return `${this.#config.baseUrl}/${this.route(path)}`;
   }
 
   /** Perform the call and return the parsed body (`null` for an empty body). */
@@ -93,8 +134,10 @@ export class HttpClient {
     return result;
   }
 
+  /** Returned `url` is the redacted route URL, not the one sent. */
   async #send(call: HttpCall): Promise<{ status: number; body: unknown; url: string }> {
     const url = this.url(call.path, call.query);
+    const reportedUrl = this.routeUrl(call.path);
     const headers: Record<string, string> = {
       Accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
       'User-Agent': this.#config.userAgent,
@@ -102,7 +145,7 @@ export class HttpClient {
     if (call.auth) {
       if (!this.#config.accessToken) {
         throw new PostwayConfigError(
-          `${call.method} ${call.path.join('/')} requires a merchant access token; pass accessToken to the client`,
+          `${call.method} ${this.route(call.path)} requires a merchant access token; pass accessToken to the client`,
         );
       }
       headers.Authorization = `${this.#config.tokenType} ${this.#config.accessToken}`;
@@ -113,26 +156,27 @@ export class HttpClient {
       payload = JSON.stringify(call.body);
     }
 
+    if (call.timeoutMs !== undefined) assertTimeoutMs(call.timeoutMs);
     const timeoutMs = call.timeoutMs ?? this.#config.timeoutMs;
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = call.signal ? AbortSignal.any([call.signal, timeout]) : timeout;
 
     let response: Response;
     try {
-      const init: RequestInit = { method: call.method, headers, signal };
+      const init: RequestInit = { method: call.method, headers, signal, redirect: 'error' };
       if (payload !== undefined) init.body = payload;
       response = await this.#config.fetch(url, init);
     } catch (error) {
-      throw toRequestError(call.method, url, error, timeout.aborted ? timeoutMs : undefined);
+      throw toRequestError(call.method, reportedUrl, error, timeout.aborted ? timeoutMs : undefined);
     }
 
     let text: string;
     try {
       text = await response.text();
     } catch (error) {
-      throw toRequestError(call.method, url, error, timeout.aborted ? timeoutMs : undefined);
+      throw toRequestError(call.method, reportedUrl, error, timeout.aborted ? timeoutMs : undefined);
     }
-    return { status: response.status, body: parseBody(text, response.headers.get('content-type')), url };
+    return { status: response.status, body: parseBody(text, response.headers.get('content-type')), url: reportedUrl };
   }
 }
 

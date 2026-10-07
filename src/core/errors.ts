@@ -6,12 +6,16 @@ export class PostwayError extends Error {
   }
 }
 
-/** The client is missing configuration a call needs (e.g. no access token for a guarded route). */
+/**
+ * Invalid client options or call arguments (unsafe base URL, header value, timeout or path
+ * parameter), or a guarded call without an access token. Messages never echo the offending value.
+ */
 export class PostwayConfigError extends PostwayError {}
 
 /** Details shared by API-level errors. */
 export interface PostwayApiErrorDetails {
   method: string;
+  /** Request URL with caller-supplied path parameters replaced by `:name` placeholders. */
   url: string;
   /** HTTP status of the response. */
   status: number;
@@ -32,11 +36,16 @@ export interface PostwayApiErrorDetails {
  */
 export class PostwayApiError extends PostwayError implements PostwayApiErrorDetails {
   readonly method: string;
+  /** Request URL with caller-supplied path parameters replaced by `:name` placeholders. */
   readonly url: string;
   readonly status: number;
   readonly code?: number;
   readonly messages: string[];
-  readonly body: unknown;
+  /**
+   * Parsed response body. Non-enumerable, so `console.log(error)` and `JSON.stringify(error)`
+   * leave it out; read `error.body` explicitly when you need it.
+   */
+  declare readonly body: unknown;
 
   constructor(details: PostwayApiErrorDetails, message?: string) {
     super(message ?? (details.messages.join('; ') || `HTTP ${details.status}`));
@@ -45,7 +54,12 @@ export class PostwayApiError extends PostwayError implements PostwayApiErrorDeta
     this.status = details.status;
     if (details.code !== undefined) this.code = details.code;
     this.messages = details.messages;
-    this.body = details.body;
+    Object.defineProperty(this, 'body', {
+      value: details.body,
+      enumerable: false,
+      writable: false,
+      configurable: true,
+    });
   }
 }
 
@@ -59,6 +73,7 @@ export class PostwayBusinessError extends PostwayApiError {}
 /** The request did not complete: network failure, abort, or timeout. */
 export class PostwayRequestError extends PostwayError {
   readonly method: string;
+  /** Request URL with caller-supplied path parameters replaced by `:name` placeholders. */
   readonly url: string;
 
   constructor(method: string, url: string, message: string, options?: ErrorOptions) {

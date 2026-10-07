@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../core/http-client.js';
+import { param, type HttpClient, type RequestOptions } from '../core/http-client.js';
 import type { FilterResponse } from '../types/common.js';
 import type {
   MerchantOrderShipmentCalculatePriceRequest,
@@ -18,7 +18,7 @@ export class OrderShipmentsResource {
       (await this.http.request<MerchantOrderShipmentData | null>({
         ...options,
         method: 'GET',
-        path: ['order-shipment', 'get-by-tracking-no', trackingNo],
+        path: ['order-shipment', 'get-by-tracking-no', param('tracking_no', trackingNo)],
         auth: true,
       })) ?? null
     );
@@ -30,7 +30,7 @@ export class OrderShipmentsResource {
       (await this.http.request<MerchantOrderShipmentData | null>({
         ...options,
         method: 'GET',
-        path: ['order-shipment', 'get-by-ref', ref],
+        path: ['order-shipment', 'get-by-ref', param('ref', ref)],
         auth: true,
       })) ?? null
     );

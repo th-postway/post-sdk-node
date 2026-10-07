@@ -9,6 +9,7 @@ export interface RecordedCall {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  redirect: RequestInit['redirect'];
 }
 
 /** JSON response as the API sends it. */
@@ -43,6 +44,7 @@ export function setup(responses: Response[] = [], options: PostwayMerchantClient
       method: init.method ?? 'GET',
       headers: { ...(init.headers as Record<string, string>) },
       body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body,
+      redirect: init.redirect,
     });
     const next = queue.shift();
     if (!next) throw new Error(`unexpected request ${init.method} ${url}`);

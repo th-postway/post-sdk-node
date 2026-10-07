@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../core/http-client.js';
+import { param, type HttpClient, type RequestOptions } from '../core/http-client.js';
 import type { FileHttpResponse } from '../types/common.js';
 import type { MerchantLabelOrderShipmentsRequest, MerchantLabelReceiptOptions } from '../types/labels.js';
 
@@ -30,7 +30,7 @@ export class LabelsResource {
     return this.http.request({
       ...options,
       method: 'GET',
-      path: ['label', 'receipt', receiptNo],
+      path: ['label', 'receipt', param('receipt_no', receiptNo)],
       query: { receipt_size: receiptSize },
       auth: true,
     });

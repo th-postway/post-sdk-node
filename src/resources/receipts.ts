@@ -1,4 +1,4 @@
-import type { HttpClient, RequestOptions } from '../core/http-client.js';
+import { param, type HttpClient, type RequestOptions } from '../core/http-client.js';
 import type { PublicReceiptResponse } from '../types/receipts.js';
 
 /**
@@ -14,7 +14,12 @@ export class ReceiptsResource {
    * @throws PostwayApiError (404) when the token is invalid or the receipt is gone.
    */
   getPublic(token: string, options?: RequestOptions): Promise<PublicReceiptResponse> {
-    return this.http.request({ ...options, method: 'GET', path: ['receipt', 'public', token], auth: false });
+    return this.http.request({
+      ...options,
+      method: 'GET',
+      path: ['receipt', 'public', param('token', token)],
+      auth: false,
+    });
   }
 
   /**
@@ -24,13 +29,17 @@ export class ReceiptsResource {
    */
   async getPublicHtml(token: string, options?: RequestOptions): Promise<string> {
     return (
-      (await this.http.request<string | null>({ ...options, method: 'GET', path: ['receipt', token], auth: false })) ??
-      ''
+      (await this.http.request<string | null>({
+        ...options,
+        method: 'GET',
+        path: ['receipt', param('token', token)],
+        auth: false,
+      })) ?? ''
     );
   }
 
   /** The URL of the public receipt page, e.g. to show or encode as a QR code. */
   publicUrl(token: string): string {
-    return this.http.url(['receipt', token]);
+    return this.http.url(['receipt', param('token', token)]);
   }
 }
