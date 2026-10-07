@@ -26,11 +26,14 @@ npm run demo                      # builds dist/, then runs demo/quick-start.ts
 
 `npm run demo` builds first because the demo imports `@th-postway/post-sdk`, exactly as an application would. Node resolves that name to this package's own `dist/` through the `exports` map (package self-reference). To skip the rebuild: `node --experimental-strip-types demo/quick-start.ts`.
 
-| Variable                    | Required      | Meaning                                                                                        |
-| --------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `POSTWAY_ACCESS_TOKEN`      | for steps 2–6 | Merchant session token. `POSTWAY_MERCHANT_ACCESS_TOKEN` (used by integration tests) also works |
-| `POSTWAY_MERCHANT_BASE_URL` | no            | Base URL override. Default: `https://sandbox-post.postway.co.th/merchant`                      |
-| `POSTWAY_DEMO_CREATE`       | no            | `1` runs step 6                                                                                |
+| Variable                                      | Required      | Meaning                                                                                                                               |
+| --------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTWAY_ACCESS_TOKEN`                        | for steps 2–6 | Merchant session token. `POSTWAY_MERCHANT_ACCESS_TOKEN` (used by integration tests) also works                                        |
+| `POSTWAY_MERCHANT_BASE_URL`                   | no            | Base URL override. Default: `https://sandbox-post.postway.co.th/merchant`                                                             |
+| `POSTWAY_DEMO_CREATE`                         | no            | `1` runs step 6                                                                                                                       |
+| `POSTWAY_CLIENT_ID` / `POSTWAY_CLIENT_SECRET` | no            | The store's client credentials. Not read by the demo or the SDK: the API has no token endpoint, so authenticate with the access token |
+
+The demo reads environment variables only. To keep them in a local `.env` (gitignored, never committed), load it first: `set -a; . ./.env; set +a; npm run demo`.
 
 Without a token the demo pings, prints which variable to set, and exits with code 1. A 403 means the token is missing, unknown or expired.
 
