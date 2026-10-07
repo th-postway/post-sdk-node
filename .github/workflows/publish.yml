@@ -1,0 +1,32 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: Tag must match package.json version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node -e "const v = require('./package.json').version; if ('v' + v !== process.env.TAG) { console.error('tag', process.env.TAG, 'does not match package version', v); process.exit(1) }"
+      - run: npm run check
+      # prepublishOnly re-runs the checks and prepack builds dist/.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

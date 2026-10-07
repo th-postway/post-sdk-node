@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # Must track the minimum supported Node major, not the newest.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
