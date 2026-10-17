@@ -8,6 +8,8 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const HEADER_VALUE = /^[\x20-\x7E]+$/;
 /** RFC 9110 `token`: the auth-scheme part of `Authorization`. */
 const AUTH_SCHEME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
+/** With the `u` flag this matches only surrogates that are not part of a pair. */
+const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
 
 /**
  * Validate and normalise a base URL: absolute, `https:` (or `http:` to a loopback host), no
@@ -62,5 +64,8 @@ export function assertAuthScheme(value: unknown): asserts value is string {
 export function assertPathSegment(value: unknown, name: string): asserts value is string {
   if (typeof value !== 'string' || value === '' || value === '.' || value === '..') {
     throw new PostwayConfigError(`${name} must be a non-empty string other than "." or ".."`);
+  }
+  if (LONE_SURROGATE.test(value)) {
+    throw new PostwayConfigError(`${name} must be well-formed Unicode text`);
   }
 }
