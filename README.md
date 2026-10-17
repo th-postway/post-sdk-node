@@ -205,7 +205,7 @@ All errors extend `PostwayError`.
 | ---------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `PostwayApiError`                                    | Non-2xx response                                                            | `status`, `code`, `messages[]`, `body`, `method`, `url` |
 | `PostwayBusinessError` _(extends `PostwayApiError`)_ | 2xx response whose envelope says `isSuccess: false`                         | same                                                    |
-| `PostwayRequestError`                                | Network failure, abort or timeout; nothing came back                        | `cause`, `method`, `url`                                |
+| `PostwayRequestError`                                | Network failure, refused redirect, abort or timeout; nothing came back      | `cause`, `method`, `url`                                |
 | `PostwayConfigError`                                 | Invalid client options or call arguments, or a guarded call without a token | —                                                       |
 
 The server reports errors as `{ code, isSuccess: false, message, data: null }` with the real HTTP status:
@@ -217,12 +217,13 @@ The server reports errors as `{ code, isSuccess: false, message, data: null }` w
 | 404  | Public receipt token invalid                                                                    |
 | 500  | Server error; `messages` is a generic text                                                      |
 
-`code` in the body is **400 or 500**, not the HTTP status. Use `status` to branch.
+`code` in the body is **400 or 500**, not the HTTP status. Use `status` to branch. `messages` comes only from the JSON `message` field; a text body (an HTML error page, for example) stays in `body`, and `message` falls back to `HTTP <status>`.
 
-Two details keep error logs safe to keep:
+Three details keep error logs safe to keep:
 
 - `url` is the **route template** (`…/receipt/public/:token`), not the URL that was sent. Receipt tokens, tracking numbers and refs never appear in `url` or `message`.
 - `body` is **non-enumerable**: `console.error(error)` and `JSON.stringify(error)` leave it out. Read `error.body` explicitly when you need the raw response.
+- A `PostwayRequestError` quotes the underlying error in `message` with the sent URL replaced by the route template and the token by `[redacted]`, so a custom `fetch` that names the URL it failed to reach leaks nothing. `cause` is the original error, unchanged.
 
 `orderShipments.create` and `cancel` can fail **with HTTP 201** and `isSuccess: false`, for example when verification or the courier rejects the parcel. The SDK turns that into `PostwayBusinessError`, so a resolved promise always means success.
 
@@ -257,8 +258,8 @@ interface FileHttpResponse {
 
 - **Transport**: `baseUrl` must be `https://`; plain `http://` is accepted only for `localhost`, `127.0.0.1` and `[::1]`. URLs with credentials, a query string or a fragment are rejected.
 - **Headers**: `accessToken`, `tokenType` and `userAgent` are checked at construction so a pasted token with a stray line break cannot inject headers or leak into an error message.
-- **Paths**: caller-supplied path parameters are URL-encoded and may not be empty, `.` or `..`, so a bad input cannot reach a different endpoint.
-- **Redirects** are refused (`redirect: 'error'`); the API never redirects, and following one could re-send `Authorization` elsewhere.
+- **Paths**: caller-supplied path parameters are URL-encoded and may not be empty, `.` or `..` or contain unpaired surrogates, so a bad input cannot reach a different endpoint or fail outside the SDK's error types.
+- **Redirects** are refused (`redirect: 'error'`), and a 3xx response or a followed redirect from a custom `fetch` throws `PostwayRequestError`; the API never redirects, and following one could re-send `Authorization` elsewhere.
 - **Retries**: none, except one replay of an authenticated call after a 403 when `getAccessToken` is set. Server errors, timeouts and network failures are never retried.
 - **Provider tokens** from `getAccessToken` pass the same header check before use. JWT claims are read only to time a refresh; neither tokens nor claims appear in errors.
 - **Errors** report route templates instead of parameter values, and response bodies are non-enumerable (see [Errors](#errors)).

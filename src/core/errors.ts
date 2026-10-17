@@ -70,7 +70,10 @@ export class PostwayApiError extends PostwayError implements PostwayApiErrorDeta
  */
 export class PostwayBusinessError extends PostwayApiError {}
 
-/** The request did not complete: network failure, abort, or timeout. */
+/**
+ * The request did not complete: network failure, refused redirect, abort, or timeout. `message` quotes the
+ * underlying error with the sent URL and token redacted; `cause` is the original error, unchanged.
+ */
 export class PostwayRequestError extends PostwayError {
   readonly method: string;
   /** Request URL with caller-supplied path parameters replaced by `:name` placeholders. */

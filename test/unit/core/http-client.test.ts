@@ -6,7 +6,7 @@ import {
   PostwayMerchantClient,
   PostwayRequestError,
 } from '../../../src/index.js';
-import { BASE_URL, apiError, json, only, setup, text } from '../support/mock-fetch.js';
+import { BASE_URL, TOKEN, apiError, empty, json, only, setup, text } from '../support/mock-fetch.js';
 
 /** A fetch that never resolves and rejects with the abort reason once the signal fires. */
 const hanging = (_url: string, init: RequestInit) =>
@@ -41,6 +41,23 @@ describe('HTTP layer', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a lone high surrogate', '\uD800'],
+    ['a lone low surrogate', 'a\uDC00'],
+  ])('rejects %s in a path parameter before any request', async (_label, value) => {
+    const { client, fetch } = setup();
+    const error = (await client.orderShipments.getByRef(value).catch((e: unknown) => e)) as PostwayConfigError;
+    expect(error).toBeInstanceOf(PostwayConfigError);
+    expect(error.message).toBe('ref must be well-formed Unicode text');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('encodes a surrogate pair in a path parameter', async () => {
+    const { client, calls } = setup([json(null)]);
+    await client.orderShipments.getByRef('A😀');
+    expect(only(calls).url).toBe(`${BASE_URL}/order-shipment/get-by-ref/A%F0%9F%98%80`);
+  });
+
   it('publicUrl rejects ".." synchronously', () => {
     const { client } = setup();
     expect(() => client.receipts.publicUrl('..')).toThrow(PostwayConfigError);
@@ -59,6 +76,28 @@ describe('HTTP layer', () => {
     const { client, calls } = setup([text('pong')]);
     await client.health.ping();
     expect(only(calls).redirect).toBe('error');
+  });
+
+  it.each([301, 302, 307, 308])(
+    'refuses a %i response from a fetch that does not enforce redirect: error',
+    async status => {
+      const redirect = empty(status);
+      redirect.headers.set('location', 'https://elsewhere.example/steal');
+      const { client, calls } = setup([redirect], { accessToken: undefined });
+      const error = (await client.receipts.getPublic('secret-token').catch((e: unknown) => e)) as PostwayRequestError;
+      expect(error).toBeInstanceOf(PostwayRequestError);
+      expect(error.message).toBe(`GET ${BASE_URL}/receipt/public/:token failed: redirect refused`);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  it('refuses a response that a custom fetch reached by following a redirect', async () => {
+    const followed = json({});
+    Object.defineProperty(followed, 'redirected', { value: true });
+    const { client } = setup([followed]);
+    await expect(client.auth.accountInfo()).rejects.toThrow(
+      `POST ${BASE_URL}/auth/account/info failed: redirect refused`,
+    );
   });
 
   it('refuses a guarded call without an access token, before any request', async () => {
@@ -104,6 +143,18 @@ describe('HTTP layer', () => {
     expect(error.status).toBe(502);
     expect(error.body).toBe('<html>Bad Gateway</html>');
     expect(error.code).toBeUndefined();
+    expect(error.messages).toEqual([]);
+    expect(error.message).toBe('HTTP 502');
+  });
+
+  it('keeps a text error body that echoes the path out of the message', async () => {
+    const { client } = setup([text('Cannot GET /merchant/receipt/public/secret-token', 404, 'text/plain')], {
+      accessToken: undefined,
+    });
+    const error = (await client.receipts.getPublic('secret-token').catch((e: unknown) => e)) as PostwayApiError;
+    expect(error.message).toBe('HTTP 404');
+    expect(error.body).toBe('Cannot GET /merchant/receipt/public/secret-token');
+    expect(JSON.stringify(error)).not.toContain('secret-token');
   });
 
   it('keeps the response body readable but non-enumerable', async () => {
@@ -155,6 +206,38 @@ describe('HTTP layer', () => {
     expect(error.cause).toBe(cause);
     expect(error.url).toBe(`${BASE_URL}/receipt/public/:token`);
     expect(error.message).toBe(`GET ${BASE_URL}/receipt/public/:token failed: fetch failed`);
+  });
+
+  it.each([
+    ['the full URL', (url: string) => `request to ${url} failed, reason: ECONNREFUSED`],
+    ['the URL without its origin', (url: string) => `Max retries exceeded with url: ${new URL(url).pathname}`],
+  ])('redacts %s quoted by a custom fetch error', async (_label, describe) => {
+    let cause: Error | undefined;
+    const client = new PostwayMerchantClient({
+      baseUrl: BASE_URL,
+      fetch: async url => {
+        cause = new Error(describe(url));
+        throw cause;
+      },
+    });
+    const error = (await client.receipts.getPublic('secret-token').catch((e: unknown) => e)) as PostwayRequestError;
+    expect(error.message).not.toContain('secret-token');
+    expect(error.message).toContain('/merchant/receipt/public/:token');
+    expect(error.cause).toBe(cause);
+  });
+
+  it('redacts the access token quoted by a custom fetch error', async () => {
+    const client = new PostwayMerchantClient({
+      baseUrl: BASE_URL,
+      accessToken: TOKEN,
+      fetch: async (_url, init) => {
+        throw new Error(`bad header ${(init.headers as Record<string, string>).Authorization}`);
+      },
+    });
+    const error = (await client.orderShipments.getByTrackingNo('TH0001').catch((e: unknown) => e)) as Error;
+    expect(error.message).toBe(
+      `GET ${BASE_URL}/order-shipment/get-by-tracking-no/:tracking_no failed: bad header Bearer [redacted]`,
+    );
   });
 
   it('times out with PostwayRequestError and a redacted URL', async () => {

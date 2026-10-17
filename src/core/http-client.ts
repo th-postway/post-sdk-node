@@ -191,14 +191,20 @@ export class HttpClient {
       if (payload !== undefined) init.body = payload;
       response = await this.#config.fetch(url, init);
     } catch (error) {
-      throw toRequestError(call.method, reportedUrl, error, timeout.aborted ? timeoutMs : undefined);
+      throw toRequestError(call.method, { url, reportedUrl, token }, error, timeout.aborted ? timeoutMs : undefined);
+    }
+
+    // A custom `fetch` may ignore `redirect: 'error'`; never hand back what a redirect led to.
+    if (response.redirected || (response.status >= 300 && response.status < 400)) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new PostwayRequestError(call.method, reportedUrl, `${call.method} ${reportedUrl} failed: redirect refused`);
     }
 
     let text: string;
     try {
       text = await response.text();
     } catch (error) {
-      throw toRequestError(call.method, reportedUrl, error, timeout.aborted ? timeoutMs : undefined);
+      throw toRequestError(call.method, { url, reportedUrl, token }, error, timeout.aborted ? timeoutMs : undefined);
     }
     return { status: response.status, body: parseBody(text, response.headers.get('content-type')), url: reportedUrl };
   }
@@ -231,8 +237,8 @@ function isEnvelope(value: unknown): value is HttpBaseResponse<unknown> {
   return typeof value === 'object' && value !== null && 'isSuccess' in value;
 }
 
+/** Only an object's `message` counts: a text body (an HTML error page, an echoed path) never becomes the message. */
 function describeBody(body: unknown): { code?: number; messages: string[] } {
-  if (typeof body === 'string') return { messages: body ? [body] : [] };
   if (typeof body !== 'object' || body === null) return { messages: [] };
   const { code, message } = body as { code?: unknown; message?: unknown };
   const messages = Array.isArray(message)
@@ -243,12 +249,47 @@ function describeBody(body: unknown): { code?: number; messages: string[] } {
   return typeof code === 'number' ? { code, messages } : { messages };
 }
 
-function toRequestError(method: string, url: string, error: unknown, timedOutAfterMs?: number): PostwayRequestError {
+/** The URL sent, the redacted URL reported instead, and the token sent (if any). */
+interface SentRequest {
+  url: string;
+  reportedUrl: string;
+  token: string | undefined;
+}
+
+function toRequestError(
+  method: string,
+  sent: SentRequest,
+  error: unknown,
+  timedOutAfterMs?: number,
+): PostwayRequestError {
+  const url = sent.reportedUrl;
   if (timedOutAfterMs !== undefined) {
     return new PostwayRequestError(method, url, `${method} ${url} timed out after ${timedOutAfterMs} ms`, {
       cause: error,
     });
   }
-  const reason = error instanceof Error ? error.message : String(error);
+  const reason = redactReason(error instanceof Error ? error.message : String(error), sent);
   return new PostwayRequestError(method, url, `${method} ${url} failed: ${reason}`, { cause: error });
+}
+
+/**
+ * A transport's error text with the sent URL (whole, or just its path) replaced by the route template and
+ * the token by `[redacted]`: custom `fetch` implementations often quote the URL they failed to reach.
+ */
+function redactReason(reason: string, { url, reportedUrl, token }: SentRequest): string {
+  const { origin } = new URL(url);
+  const [sentPath = ''] = url.slice(origin.length).split('?');
+  const reportedPath = reportedUrl.slice(origin.length);
+  const replacements: [string, string][] = [
+    [url, reportedUrl],
+    [origin + sentPath, reportedUrl],
+    [url.slice(origin.length), reportedPath],
+    [sentPath, reportedPath],
+  ];
+  if (token) replacements.push([token, '[redacted]']);
+  let redacted = reason;
+  for (const [from, to] of replacements) {
+    if (from && from !== to) redacted = redacted.replaceAll(from, to);
+  }
+  return redacted;
 }
