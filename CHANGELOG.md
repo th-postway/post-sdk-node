@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [22.0.1] - 2026-10-17
+
 ### Added
 
 - Runnable Quick start in `demo/` (`npm run demo`): read-only and sandbox by default, with an opt-in sandbox create + label (`POSTWAY_DEMO_CREATE=1`). `npm run typecheck` also checks the demo. Not part of the published package.
@@ -43,5 +45,6 @@ Initial public release.
 
 - Only the `production` and `sandbox` environments are built in. Pass `baseUrl` for any other host.
 
-[Unreleased]: https://github.com/th-postway/post-sdk-node/compare/22.0.0...HEAD
+[Unreleased]: https://github.com/th-postway/post-sdk-node/compare/22.0.1...HEAD
+[22.0.1]: https://github.com/th-postway/post-sdk-node/compare/22.0.0...22.0.1
 [22.0.0]: https://github.com/th-postway/post-sdk-node/releases/tag/22.0.0

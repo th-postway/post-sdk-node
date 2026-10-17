@@ -1,6 +1,6 @@
 {
   "name": "@th-postway/post-sdk",
-  "version": "22.0.0",
+  "version": "22.0.1",
   "description": "TypeScript SDK for the Postway Merchant API (order shipments, labels, pricing, Thailand postal master).",
   "keywords": [
     "postway",
